@@ -221,7 +221,7 @@ func (dsClient DataSwapperClient) getPrefix() string {
 
 func (dsClient DataSwapperClient) getAddress(name string) string {
 	prefix := dsClient.getPrefix()
-	nameAddress := Sha512HashValue(name)[FAMILY_VERB_ADDRESS_LENGTH:]
+	nameAddress := Sha512HashValue(name)[:FAMILY_VERB_ADDRESS_LENGTH]
 	return prefix + nameAddress
 }
 
