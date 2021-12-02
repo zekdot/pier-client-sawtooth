@@ -31,7 +31,7 @@ replace gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.7
 
 replace golang.org/x/net => golang.org/x/net v0.0.0-20200202094626-16171245cfb2
 
-//replace github.com/meshplus/pier => ../pier
+replace github.com/meshplus/pier => ../pier
 
 replace golang.org/x/text => golang.org/x/text v0.3.0
 
