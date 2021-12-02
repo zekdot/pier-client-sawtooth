@@ -7,4 +7,4 @@ GO  = GO111MODULE=on go
 ## make fabric1.4: build fabric(1.4) client plugin
 sawtooth:
 	mkdir -p build
-	$(GO) build --buildmode=plugin -o build/fabric-client-1.4.so ./*.go
+	$(GO) build --buildmode=plugin -o build/sawtooth.so ./*.go
