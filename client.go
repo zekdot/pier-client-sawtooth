@@ -1,10 +1,11 @@
 package main
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/meshplus/bitxhub-model/pb"
-	"github.com/hashicorp/go-plugin"
-	"github.com/meshplus/pier/pkg/plugins"
+	"github.com/meshplus/pier/pkg/model"
+	"github.com/meshplus/pier/pkg/plugins/client"
 	"strconv"
 	"strings"
 )
@@ -20,7 +21,7 @@ type Client struct {
 	callbackMeta map[string]uint64	// callback计数器
 	inMsgMap map[string]string	// 主动请求的消息
 }
-var _ plugins.Client = (*Client)(nil)
+var _ client.Client = (*Client)(nil)
 // 对方传过来的函数调用
 type CallFunc struct {
 	Func string   `json:"func"`
@@ -28,9 +29,10 @@ type CallFunc struct {
 }
 
 // 初始化Plugin服务
-func (c *Client) Initialize(configPath, pierId string, extra []byte) error {
+func NewClient(configPath, pierId string, extra []byte) (client.Client, error) {
 	// 造一个永远不会用的通道
 	eventC := make(chan *pb.IBTP)
+	c := &Client{}
 	// 初始化相关变量和计时器等
 	c.eventC = eventC
 	c.pierId = pierId
@@ -40,22 +42,24 @@ func (c *Client) Initialize(configPath, pierId string, extra []byte) error {
 	c.outMeta = make(map[string]uint64)
 	c.inMeta = make(map[string]uint64)
 	c.callbackMeta = make(map[string]uint64)
-
-	return nil
+	c.inMsgMap = make(map[string]string)
+	return c, nil
 }
 // 启动Plugin服务的接口
 func (c *Client) Start() error {
 	// 啥都不用干接口
 	// 采用轮询方式，定时从sawtooth中拉取数据
 	//return c.consumer.Start()
-	// TODO 需要从文件中读取出缓存
+	// 从文件中读取出缓存
+	c.readMapFromFile("sawtooth.txt")
 	return nil
 }
 
 // 停止Plugin服务的接口
 func (c *Client) Stop() error {
 	// 啥都不用干接口
-	// TODO 需要将三个meta进行持久化存储到文件中
+	// 将三个meta和一个msgMap进行持久化存储到文件中
+	c.writeMapToFile("sawtooth.txt")
 	return nil
 }
 
@@ -76,19 +80,16 @@ func toChaincodeArgs(args ...string) [][]byte {
 // Plugin 负责执行来源链过来的跨链请求，Pier调用SubmitIBTP提交收到的跨链请求。
 
 // 主要方法，网关需要在这里进行数据的查取
-func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*pb.SubmitIBTPResponse, error) {
+func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 	pd := &pb.Payload{}
-	ret := &pb.SubmitIBTPResponse{}
+	ret := &model.PluginResponse{}
 	if err := pd.Unmarshal(ibtp.Payload); err != nil {
 		return ret, fmt.Errorf("ibtp payload unmarshal: %w", err)
 	}
+	// content中包含要请求的各种参数等信息
 	content := &pb.Content{}
 	if err := content.Unmarshal(pd.Content); err != nil {
 		return ret, fmt.Errorf("ibtp content unmarshal: %w", err)
-	}
-
-	if ibtp.Category() == pb.IBTP_UNKNOWN {
-		return nil, fmt.Errorf("invalid ibtp category")
 	}
 
 	logger.Info("submit ibtp", "id", ibtp.ID(), "contract", content.DstContractId, "func", content.Func)
@@ -96,6 +97,12 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*pb.SubmitIBTPResponse, error) {
 	for i, arg := range content.Args {
 		logger.Info("arg", strconv.Itoa(i), string(arg))
 	}
+	// 目前只支持interchainGet方法
+	if content.Func != "interchainGet" {
+		return nil, errors.New("only support interchainGet")
+	}
+
+
 
 	// 主动发送的消息的回执？？这里应该不会遇到这种情况吧
 	//if ibtp.Category() == pb.IBTP_RESPONSE && content.Func == "" {
@@ -110,7 +117,7 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*pb.SubmitIBTPResponse, error) {
 	//	return ret, nil
 	//}
 	// 组装IBTP进行提交
-
+	// 调用应用链的相关方法获取到结果
 	var result [][]byte
 	//var chResp *channel.Response
 	callFunc := CallFunc{
@@ -125,14 +132,14 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*pb.SubmitIBTPResponse, error) {
 		ret.Message = fmt.Sprintf("marshal ibtp %s func %s and args: %s", ibtp.ID(), callFunc.Func, err.Error())
 
 		// 简单更新下索引好了，啥都不干
-		c.InvokeIndexUpdate(ibtp.From, ibtp.Index, ibtp.Category())
+		c.InvokeIndexUpdate(ibtp.From, ibtp.Index)
 		if err != nil {
 			return nil, err
 		}
 		//chResp = res
 	} else {
 		// 需要调用链码并且获取结果，需要Response结构作为返回值
-		resp, err := c.InvokeInterchain(ibtp.From, ibtp.Index, content.DstContractId, ibtp.Category(), bizData)
+		resp, err := c.InvokeInterchain(ibtp.From, ibtp.Index, content.DstContractId, bizData)
 		if err != nil {
 			return nil, fmt.Errorf("invoke interchain for ibtp %s to call %s: %w", ibtp.ID(), content.Func, err)
 		}
@@ -146,16 +153,16 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*pb.SubmitIBTPResponse, error) {
 	}
 
 	// If is response IBTP, then simply return
-	if ibtp.Category() == pb.IBTP_RESPONSE {
-		return ret, nil
-	}
+	//if ibtp.Category() == pb.IBTP_RESPONSE {
+	//	return ret, nil
+	//}
 	// proof简单来说就是在该链上查到的一个序列号，证明在本链中成功执行了交易，需要从sawtooth的api来找到获取方法，这里我们直接返回一个success的byte数组
 	//proof, err := c.getProof(*chResp)
 	//if err != nil {
 	//	return ret, err
 	//}
 	proof := []byte("success")
-	ret.Result, err = c.generateCallback(ibtp, result, proof, ret.Status)
+	ret.Result, err = c.generateCallback(ibtp, result, proof)
 	if err != nil {
 		return nil, err
 	}
@@ -242,21 +249,6 @@ func (c *Client) CommitCallback(ibtp *pb.IBTP) error {
 	return nil
 }
 
-// GetReceipt 获取一个已被执行IBTP的回执
-func (c *Client) GetReceipt(ibtp *pb.IBTP) (*pb.IBTP, error) {
-	result, err := c.GetInMessage(ibtp.From, ibtp.Index)
-	if err != nil {
-		return nil, err
-	}
-
-	status, err := strconv.ParseBool(string(result[0]))
-	if err != nil {
-		return nil, err
-	}
-	return c.generateCallback(ibtp, result[1:], nil, status)
-}
-
-
 // Name 描述Plugin负责的区块链的自定义名称，一般和业务相关，如司法链等。
 func (c *Client) Name() string {
 	return "data_swapper_test"
@@ -267,13 +259,10 @@ func (c *Client) Type() string {
 	return "sawtooth"
 }
 
-func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, category pb.IBTP_Category, bizCallData []byte) (*Response, error) {
+func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bizCallData []byte) (*Response, error) {
 	// 主要的调用方法
-	// 是否是一个请求的调用
+	// 目前这里必然是一个请求的回复
 	req := true
-	if category == pb.IBTP_RESPONSE {
-		req = false
-	}
 	// 直接更新一下索引
 	if req {
 		c.inMeta[from] = index
@@ -334,50 +323,11 @@ func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, ca
 	return response, nil
 }
 
-// @ibtp is the original ibtp merged from this appchain
-func (c *Client) RollbackIBTP(ibtp *pb.IBTP, isSrcChain bool) (*pb.RollbackIBTPResponse, error) {
-	// 回滚调用方法
-	ret := &pb.RollbackIBTPResponse{}
-	pd := &pb.Payload{}
-	if err := pd.Unmarshal(ibtp.Payload); err != nil {
-		return nil, fmt.Errorf("ibtp payload unmarshal: %w", err)
-	}
-	content := &pb.Content{}
-	if err := content.Unmarshal(pd.Content); err != nil {
-		return ret, fmt.Errorf("ibtp content unmarshal: %w", err)
-	}
-
-	// only support rollback for interchainCharge
-	if content.Func != "interchainCharge" {
-		return nil, nil
-	}
-
-	callFunc := CallFunc{
-		Func: content.Rollback,
-		Args: content.ArgsRb,
-	}
-	bizData, err := json.Marshal(callFunc)
-	if err != nil {
-		return ret, err
-	}
-
-	// pb.IBTP_RESPONSE indicates it is to update callback counter
-	resp, err := c.InvokeInterchain(ibtp.To, ibtp.Index, content.SrcContractId, pb.IBTP_RESPONSE, bizData)
-	if err != nil {
-		return nil, fmt.Errorf("invoke interchain for ibtp %s to call %s: %w", ibtp.ID(), content.Rollback, err)
-	}
-
-	ret.Status = resp.OK
-	ret.Message = resp.Message
-
-	return ret, nil
-}
-
 func (c *Client) IncreaseInMeta(original *pb.IBTP) (*pb.IBTP, error) {
 	// 直接更新索引
-	c.InvokeIndexUpdate(original.From, original.Index, original.Category())
+	c.InvokeIndexUpdate(original.From, original.Index)
 	proof := []byte("success")
-	ibtp, err := c.generateCallback(original, nil, proof, false)
+	ibtp, err := c.generateCallback(original, nil, proof)
 	if err != nil {
 		return nil, err
 	}
@@ -385,12 +335,9 @@ func (c *Client) IncreaseInMeta(original *pb.IBTP) (*pb.IBTP, error) {
 }
 
 // 该方法似乎只更新了索引，返回索引更新的结果
-func (c Client) InvokeIndexUpdate(from string, index uint64, category pb.IBTP_Category) ( *Response, error) {
+func (c Client) InvokeIndexUpdate(from string, index uint64) ( *Response, error) {
 	//
 	req := true
-	if category == pb.IBTP_RESPONSE {
-		req = false
-	}
 	// 直接更新一下索引
 	if req {
 		c.inMeta[from] = index
@@ -423,16 +370,4 @@ type Response struct {
 	OK      bool   `json:"ok"`
 	Message string `json:"message"`
 	Data    []byte `json:"data"`
-}
-
-func main() {
-	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: plugins.Handshake,
-		Plugins: map[string]plugin.Plugin{
-			plugins.PluginName: &plugins.AppchainGRPCPlugin{Impl: &Client{}},
-		},
-		GRPCServer: plugin.DefaultGRPCServer,
-	})
-
-	logger.Info("Plugin server down")
 }
