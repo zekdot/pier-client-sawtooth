@@ -1,4 +1,5 @@
 package main
+
 import (
 	"encoding/json"
 	"errors"
@@ -6,7 +7,6 @@ import (
 	"github.com/meshplus/bitxhub-model/pb"
 	"github.com/meshplus/pier/pkg/model"
 	"github.com/meshplus/pier/pkg/plugins/client"
-	"strconv"
 	"strings"
 )
 
@@ -15,7 +15,7 @@ import (
 type Client struct {
 	eventC chan *pb.IBTP
 	pierId string
-	dsClient *DataSwapperClient	// 用于调用sawtooth交易族的客户端
+	//dsClient *DataSwapperClient	// 用于调用sawtooth交易族的客户端
 	outMeta map[string]uint64	// out计数器
 	inMeta map[string]uint64	// in计数器
 	callbackMeta map[string]uint64	// callback计数器
@@ -36,7 +36,7 @@ func NewClient(configPath, pierId string, extra []byte) (client.Client, error) {
 	// 初始化相关变量和计时器等
 	c.eventC = eventC
 	c.pierId = pierId
-	c.dsClient, _ = NewDataSwapperClient("http://127.0.0.1:8008", "/home/hzh/.sawtooth/keys/hzh.priv")
+	//c.dsClient, _ = NewDataSwapperClient("http://127.0.0.1:8008", "/home/hzh/.sawtooth/keys/hzh.priv")
 
 	// 设置in、out和callback三个map
 	c.outMeta = make(map[string]uint64)
@@ -91,12 +91,17 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 	if err := content.Unmarshal(pd.Content); err != nil {
 		return ret, fmt.Errorf("ibtp content unmarshal: %w", err)
 	}
-
-	logger.Info("submit ibtp", "id", ibtp.ID(), "contract", content.DstContractId, "func", content.Func)
-	// 打印接受到的每一个参数
+	fmt.Println("content.DstContractId ID is " + content.DstContractId)
+	fmt.Println("content.Func is " + content.Func)
+	fmt.Println("content.Args is ")
 	for i, arg := range content.Args {
-		logger.Info("arg", strconv.Itoa(i), string(arg))
+		fmt.Println(string(i) + string(arg))
 	}
+	//logger.Info("submit ibtp", "id", ibtp.ID(), "contract", content.DstContractId, "func", content.Func)
+	//// 打印接受到的每一个参数
+	//for i, arg := range content.Args {
+	//	logger.Info("arg", strconv.Itoa(i), string(arg))
+	//}
 	// 目前只支持interchainGet方法
 	if content.Func != "interchainGet" {
 		return nil, errors.New("only support interchainGet")
@@ -127,6 +132,7 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 	bizData, err := json.Marshal(callFunc)
 	// 注意下面的区别！一个是InvokeIndexUpdate，另一个是InvokeInterchain，前者仅更新索引，后者则是实际调用InvokeInterchain方法
 	if err != nil {
+		fmt.Println("Marshal failed?")
 		// 如果序列化失败，全部都是失败之后要进行的操作，仅仅更新索引
 		ret.Status = false
 		ret.Message = fmt.Sprintf("marshal ibtp %s func %s and args: %s", ibtp.ID(), callFunc.Func, err.Error())
@@ -138,6 +144,7 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 		}
 		//chResp = res
 	} else {
+		fmt.Println("Marshal success!")
 		// 需要调用链码并且获取结果，需要Response结构作为返回值
 		resp, err := c.InvokeInterchain(ibtp.From, ibtp.Index, content.DstContractId, bizData)
 		if err != nil {
@@ -162,7 +169,9 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 	//	return ret, err
 	//}
 	proof := []byte("success")
+
 	ret.Result, err = c.generateCallback(ibtp, result, proof)
+	fmt.Println("return value")
 	if err != nil {
 		return nil, err
 	}
@@ -262,13 +271,13 @@ func (c *Client) Type() string {
 func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bizCallData []byte) (*Response, error) {
 	// 主要的调用方法
 	// 目前这里必然是一个请求的回复
-	req := true
+	//req := true
 	// 直接更新一下索引
-	if req {
+	//if req {
 		c.inMeta[from] = index
-	} else {
+	//} else {
 		c.outMeta[from] = index
-	}
+	//}
 	// destAddr应该需要处理一下，这里直接简单修改为"get"
 	destAddr = "get"
 	// from、index、destAddr等应该是用来进行索引等meta数据的记录的
@@ -306,11 +315,8 @@ func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bi
 	// 进行实际的链码调用，bizCallData为请求参数，这里是从CallBackFunc序列化得来的，这里直接给他反序列化了
 	bizCallFun := &CallFunc{}
 	json.Unmarshal(bizCallData, bizCallFun)
-	key := string(bizCallFun.Args[0][:])
-	value, err := c.dsClient.Get(key)
-	if err != nil {
-		return nil, err
-	}
+	//key := string(bizCallFun.Args[0][:])
+	value := "sawtooth_result"
 	// 调用sawtooth客户端来得到调用结果，事实上目前只会调用get方法，所以只需要得到get的key参数即可，key参数为简单转换为字节数组数组的字符串数组，所以只需要定位key的索引然后字节数组转字符串即可
 	response := &Response{
 		OK:   true,
@@ -337,13 +343,13 @@ func (c *Client) IncreaseInMeta(original *pb.IBTP) (*pb.IBTP, error) {
 // 该方法似乎只更新了索引，返回索引更新的结果
 func (c Client) InvokeIndexUpdate(from string, index uint64) ( *Response, error) {
 	//
-	req := true
+	//req := true
 	// 直接更新一下索引
-	if req {
+	//if req {
 		c.inMeta[from] = index
-	} else {
+	//} else {
 		c.outMeta[from] = index
-	}
+	//}
 	//// 构造请求参数
 	//args := util.ToChaincodeArgs(from, strconv.FormatUint(index, 10), req)
 	//request := channel.Request{
