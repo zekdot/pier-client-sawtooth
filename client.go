@@ -15,7 +15,7 @@ import (
 type Client struct {
 	eventC chan *pb.IBTP
 	pierId string
-	//dsClient *DataSwapperClient	// 用于调用sawtooth交易族的客户端
+	dsClient *DataSwapperClient	// 用于调用sawtooth交易族的客户端
 	outMeta map[string]uint64	// out计数器
 	inMeta map[string]uint64	// in计数器
 	callbackMeta map[string]uint64	// callback计数器
@@ -36,7 +36,7 @@ func NewClient(configPath, pierId string, extra []byte) (client.Client, error) {
 	// 初始化相关变量和计时器等
 	c.eventC = eventC
 	c.pierId = pierId
-	//c.dsClient, _ = NewDataSwapperClient("http://127.0.0.1:8008", "/home/hzh/.sawtooth/keys/hzh.priv")
+	c.dsClient, _ = NewDataSwapperClient("http://127.0.0.1:8008", "/home/hzh/.sawtooth/keys/hzh.priv")
 
 	// 设置in、out和callback三个map
 	c.outMeta = make(map[string]uint64)
