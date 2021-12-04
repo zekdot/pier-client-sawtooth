@@ -48,3 +48,4 @@ replace github.com/pelletier/go-toml => github.com/pelletier/go-toml v1.2.0
 replace github.com/spf13/jwalterweatherman => github.com/spf13/jwalterweatherman v1.0.0
 
 replace github.com/mholt/archiver => github.com/mholt/archiver v0.0.0-20180417220235-e4ef56d48eb0
+
