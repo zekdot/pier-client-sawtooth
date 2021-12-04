@@ -30,6 +30,7 @@ replace github.com/golang/protobuf => github.com/golang/protobuf v1.3.2
 
 replace google.golang.org/grpc => google.golang.org/grpc v1.27.1
 
+
 replace gopkg.in/yaml.v2 => gopkg.in/yaml.v2 v2.2.7
 
 replace golang.org/x/net => golang.org/x/net v0.0.0-20200202094626-16171245cfb2
