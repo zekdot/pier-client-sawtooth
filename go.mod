@@ -23,6 +23,7 @@ require (
 	github.com/sirupsen/logrus v1.5.0 // indirect
 	github.com/spf13/viper v1.6.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0
+	github.com/btcsuite/btcd v0.21.0-beta
 )
 
 replace github.com/golang/protobuf => github.com/golang/protobuf v1.3.2
@@ -49,3 +50,6 @@ replace github.com/spf13/jwalterweatherman => github.com/spf13/jwalterweatherman
 
 replace github.com/mholt/archiver => github.com/mholt/archiver v0.0.0-20180417220235-e4ef56d48eb0
 
+replace github.com/btcsuite/btcd => github.com/btcsuite/btcd v0.20.1-beta
+
+replace google.golang.org/genproto => google.golang.org/genproto v0.0.0-20200218151345-dad8c97a84f5
