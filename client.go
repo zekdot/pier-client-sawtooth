@@ -150,12 +150,12 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invoke interchain for ibtp %s to call %s: %w", ibtp.ID(), content.Func, err)
 		}
-
-		ret.Status = resp.OK
-		ret.Message = resp.Message
+		// 以上是调用交易族并获取结果的逻辑
+		ret.Status = true
+		ret.Message = "success"
 
 		// if there is callback function, parse returned value
-		result = toChaincodeArgs(strings.Split(string(resp.Data), ",")...)
+		result = toChaincodeArgs(strings.Split(resp, ",")...)
 		//chResp = res
 	}
 
@@ -268,7 +268,7 @@ func (c *Client) Type() string {
 	return "sawtooth"
 }
 
-func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bizCallData []byte) (*Response, error) {
+func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bizCallData []byte) (string, error) {
 	// 主要的调用方法
 	// 目前这里必然是一个请求的回复
 	//req := true
@@ -316,17 +316,22 @@ func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bi
 	bizCallFun := &CallFunc{}
 	json.Unmarshal(bizCallData, bizCallFun)
 	//key := string(bizCallFun.Args[0][:])
-	value := "sawtooth_result"
-	// 调用sawtooth客户端来得到调用结果，事实上目前只会调用get方法，所以只需要得到get的key参数即可，key参数为简单转换为字节数组数组的字符串数组，所以只需要定位key的索引然后字节数组转字符串即可
-	response := &Response{
-		OK:   true,
-		Data: []byte(value),
-	}
-	//if err := json.Unmarshal(res.Payload, response); err != nil {
-	//	return nil, err
+	// 返回参数
+	//newArgs := make([][]byte, 0)
+	value := "sawtoothresult"
+	return string(bizCallFun.Args[0]) + "," + value, nil
+	//newArgs = append(newArgs, bizCallFun.Args[0])
+	//newArgs = append(newArgs, []byte(value))
+	//// 调用sawtooth客户端来得到调用结果，事实上目前只会调用get方法，所以只需要得到get的key参数即可，key参数为简单转换为字节数组数组的字符串数组，所以只需要定位key的索引然后字节数组转字符串即可
+	//response := &Response{
+	//	OK:   true,
+	//	//Data: newArgs,
 	//}
-
-	return response, nil
+	////if err := json.Unmarshal(res.Payload, response); err != nil {
+	////	return nil, err
+	////}
+	//
+	//return response, nil
 }
 
 func (c *Client) IncreaseInMeta(original *pb.IBTP) (*pb.IBTP, error) {
