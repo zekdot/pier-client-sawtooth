@@ -315,11 +315,11 @@ func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bi
 	// 进行实际的链码调用，bizCallData为请求参数，这里是从CallBackFunc序列化得来的，这里直接给他反序列化了
 	bizCallFun := &CallFunc{}
 	json.Unmarshal(bizCallData, bizCallFun)
-	//key := string(bizCallFun.Args[0][:])
+	key := string(bizCallFun.Args[0])
 	// 返回参数
 	//newArgs := make([][]byte, 0)
-	value := "sawtoothresult"
-	return string(bizCallFun.Args[0]) + "," + value, nil
+	value, _ := c.dsClient.Get(key) //"sawtoothresult"
+	return key + "," + value, nil
 	//newArgs = append(newArgs, bizCallFun.Args[0])
 	//newArgs = append(newArgs, []byte(value))
 	//// 调用sawtooth客户端来得到调用结果，事实上目前只会调用get方法，所以只需要得到get的key参数即可，key参数为简单转换为字节数组数组的字符串数组，所以只需要定位key的索引然后字节数组转字符串即可
@@ -351,9 +351,9 @@ func (c Client) InvokeIndexUpdate(from string, index uint64) ( *Response, error)
 	//req := true
 	// 直接更新一下索引
 	//if req {
-		c.inMeta[from] = index
+	c.inMeta[from] = index
 	//} else {
-		c.outMeta[from] = index
+	c.outMeta[from] = index
 	//}
 	//// 构造请求参数
 	//args := util.ToChaincodeArgs(from, strconv.FormatUint(index, 10), req)
