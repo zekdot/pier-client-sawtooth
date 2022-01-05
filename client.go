@@ -51,7 +51,7 @@ func (c *Client) Start() error {
 	// 采用轮询方式，定时从sawtooth中拉取数据
 	//return c.consumer.Start()
 	// 从文件中读取出缓存
-	c.readMapFromFile("sawtooth.txt")
+	c.readMapFromFile("/home/hzh/bitxhub/sawtooth.txt")
 	return nil
 }
 
@@ -59,7 +59,7 @@ func (c *Client) Start() error {
 func (c *Client) Stop() error {
 	// 啥都不用干接口
 	// 将三个meta和一个msgMap进行持久化存储到文件中
-	c.writeMapToFile("sawtooth.txt")
+	c.writeMapToFile("/home/hzh/bitxhub/sawtooth.txt")
 	return nil
 }
 
@@ -234,6 +234,9 @@ func (c *Client) GetInMessage(from string, index uint64) ([][]byte, error) {
 func (c *Client) GetInMeta() (map[string]uint64, error) {
 	// 直接返回对应的meta
 	//return c.unpackMap(response)
+	c.readMapFromFile("/home/hzh/bitxhub/sawtooth.txt")
+	textBytes,_ := json.Marshal(c.inMeta)
+	fmt.Println("获取到inMeta为 " + string(textBytes))
 	return c.inMeta, nil
 }
 
@@ -274,9 +277,9 @@ func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bi
 	//req := true
 	// 直接更新一下索引
 	//if req {
-		c.inMeta[from] = index
+		c.inMeta[from] = index + 1
 	//} else {
-		c.outMeta[from] = index
+		c.outMeta[from] = index + 1
 	//}
 	// destAddr应该需要处理一下，这里直接简单修改为"get"
 	destAddr = "get"
@@ -319,7 +322,10 @@ func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bi
 	// 返回参数
 	//newArgs := make([][]byte, 0)
 	value, _ := c.dsClient.Get(key) //"sawtoothresult"
+	// 将三个meta和一个msgMap进行持久化存储到文件中
+	c.writeMapToFile("/home/hzh/bitxhub/sawtooth.txt")
 	return key + "," + value, nil
+	
 	//newArgs = append(newArgs, bizCallFun.Args[0])
 	//newArgs = append(newArgs, []byte(value))
 	//// 调用sawtooth客户端来得到调用结果，事实上目前只会调用get方法，所以只需要得到get的key参数即可，key参数为简单转换为字节数组数组的字符串数组，所以只需要定位key的索引然后字节数组转字符串即可
@@ -351,9 +357,11 @@ func (c Client) InvokeIndexUpdate(from string, index uint64) ( *Response, error)
 	//req := true
 	// 直接更新一下索引
 	//if req {
-	c.inMeta[from] = index
+	c.inMeta[from] = index + 1
 	//} else {
-	c.outMeta[from] = index
+	c.outMeta[from] = index + 1
+	// 将三个meta和一个msgMap进行持久化存储到文件中
+	c.writeMapToFile("/home/hzh/bitxhub/sawtooth.txt")
 	//}
 	//// 构造请求参数
 	//args := util.ToChaincodeArgs(from, strconv.FormatUint(index, 10), req)

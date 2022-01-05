@@ -9,10 +9,6 @@ import (
 
 var Namespace = hexdigest("data_swapper")[:6]
 
-//type Data struct {
-//	key string
-//	value string
-//}
 
 // 直接存储key到另一个字符串的映射
 type DSState struct {
