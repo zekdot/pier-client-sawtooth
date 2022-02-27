@@ -1,7 +1,8 @@
 package main
 
 import (
-	"example/sawtooth-plugin/examples/data_swapper/handler"
+	"broker/contract"
+	"broker/handler"
 	"fmt"
 	"github.com/hyperledger/sawtooth-sdk-go/logging"
 	"github.com/hyperledger/sawtooth-sdk-go/processor"
@@ -49,8 +50,8 @@ func main() {
 	logger.Debugf("command line arguments: %v", os.Args)
 	logger.Debugf("verbose = %v\n", len(opts.Verbose))
 	logger.Debugf("endpoint = %v\n", endpoint)
-
-	handler := &handler.DSHandler{}
+	broker := contract.NewBroker()
+	handler := handler.NewHandler(broker)
 	processor := processor.NewTransactionProcessor(endpoint)
 	processor.AddHandler(handler)
 	processor.ShutdownOnSignal(syscall.SIGINT, syscall.SIGTERM)
