@@ -16,9 +16,11 @@
       <change beforePath="$PROJECT_DIR$/examples/broker/handler/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/handler/handler.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/examples/broker/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/main.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/examples/broker/state/state.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/state/state.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/constants.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/data_swapper_client/constants.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/ds_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/data_swapper_client/broker_client.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/data_swapper_client/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/broker_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/broker_client.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/constants.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/constants.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/get.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/get.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/set.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/set.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

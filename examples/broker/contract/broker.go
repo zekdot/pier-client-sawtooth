@@ -30,13 +30,13 @@ type Event struct {
 
 func NewBroker() *Broker {
 	return &Broker{
-		init: false,
+		//init: false,
 	}
 }
 
-func (broker *Broker) IsInit() bool {
-	return broker.init
-}
+//func (broker *Broker) IsInit() bool {
+//	return broker.init
+//}
 
 func (broker *Broker)Init(state *state.BrokerState) error {
 	inCounter := make(map[string]uint64)
@@ -46,7 +46,6 @@ func (broker *Broker)Init(state *state.BrokerState) error {
 	broker.putMap(state, innerMeta, inCounter)
 	broker.putMap(state, outterMeta, outCounter)
 	broker.putMap(state, callbackMeta, callbackCounter)
-	broker.init = true
 	return nil
 }
 

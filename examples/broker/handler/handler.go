@@ -43,14 +43,16 @@ func (handler *BrokerHandler) Apply(request *processor_pb2.TpProcessRequest, con
 	broker := handler.broker
 	//fmt.Printf("get function %s", payload.Function)
 	// if not init
-	fmt.Printf("broker init is %v\n", broker.IsInit())
-	if !broker.IsInit() {
-		broker.Init(brokerState)
-	}
+	//fmt.Printf("broker init is %v\n", broker.IsInit())
+	//if !broker.IsInit() {
+	//	broker.Init(brokerState)
+	//}
 	args := payload.Parameter
 
 	// Sawtooth server only need to finish write operation, read operation is implemented by client
 	switch payload.Function {
+	case "init":
+		return broker.Init(brokerState)
 	case "InterchainDataSwapInvoke":
 		return broker.InterchainDataSwapInvoke(brokerState, args[0], args[1], args[2])
 	case "InterchainInvoke":
