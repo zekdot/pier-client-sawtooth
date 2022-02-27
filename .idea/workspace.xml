@@ -11,16 +11,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="30164547-2db0-4d99-a8a4-2ef0521b526a" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/broker/contract/broker.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/contract/broker.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/examples/broker/handler/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/handler/handler.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/broker/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/broker/state/state.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/state/state.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/broker_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/broker_client.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/constants.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/constants.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/get.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/get.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/data_swapper_client/set.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker_client/set.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

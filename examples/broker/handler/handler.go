@@ -62,6 +62,9 @@ func (handler *BrokerHandler) Apply(request *processor_pb2.TpProcessRequest, con
 	case "set":
 		//return nil
 		return broker.Set(brokerState, args)
+	case "get":
+		_, err := broker.Get(brokerState, args)
+		return err
 	default:
 		return &processor.InvalidTransactionError{
 			Msg: fmt.Sprintf("Invalid Action : '%v'", payload.Function)}
