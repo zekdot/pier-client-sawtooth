@@ -46,6 +46,7 @@ func (broker *Broker)Init(state *state.BrokerState) error {
 	broker.putMap(state, innerMeta, inCounter)
 	broker.putMap(state, outterMeta, outCounter)
 	broker.putMap(state, callbackMeta, callbackCounter)
+	broker.init = true
 	return nil
 }
 

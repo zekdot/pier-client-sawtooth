@@ -1,12 +1,10 @@
 package main
 
 const (
-	FAMILY_NAME string = "data_swapper"
+	FAMILY_NAME string = "broker"
 	FAMILY_VERSION string = "1.0"
-	DISTRIBUTION_NAME string = "sawtooth-data_swapper"
+	DISTRIBUTION_NAME string = "sawtooth-broker"
 	DEFAULT_URL string = "http://127.0.0.1:8008"
-
-	VERB_SET string = "set"
 
 	BATCH_SUBMIT_API string = "batches"
 	BATCH_STATUS_API string = "batch_statuses"

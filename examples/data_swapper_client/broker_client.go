@@ -4,6 +4,7 @@ import (
 	bytes2 "bytes"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
@@ -19,18 +20,18 @@ import (
 	"time"
 )
 
-type DataSwapperClient struct {
+type BrokerClient struct {
 	url string
 	signer *signing.Signer
 }
 
-func NewDataSwapperClient(url string, keyfile string) (DataSwapperClient, error) {
+func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 	var privateKey signing.PrivateKey
 	if keyfile != "" {
 		// Read private key file
 		privateKeyStr, err := ioutil.ReadFile(keyfile)
 		if err != nil {
-			return DataSwapperClient{},
+			return &BrokerClient{},
 				errors.New(fmt.Sprintf("Failed to read private key: %v", err))
 		}
 		// Get private key object
@@ -40,18 +41,19 @@ func NewDataSwapperClient(url string, keyfile string) (DataSwapperClient, error)
 	}
 	cryptoFactory := signing.NewCryptoFactory(signing.NewSecp256k1Context())
 	signer := cryptoFactory.NewSigner(privateKey)
-	return DataSwapperClient{url, signer}, nil
+	return &BrokerClient{url, signer}, nil
 }
 
-func (dsClient DataSwapperClient) Set(
+func (broker *BrokerClient) Set(
 	key string, value string, wait uint) (string, error) {
-	return dsClient.sendTransaction(VERB_SET, key, value, wait)
+	return broker.sendTransaction("set", key, value, wait)
 }
 
-func (dsClient DataSwapperClient) Get(
+func (broker *BrokerClient) Get(
 	name string) (string, error) {
-	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, dsClient.getAddress(name))
-	response, err := dsClient.sendRequest(apiSuffix, []byte{}, "", name)
+	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, broker.getAddress(name, "regular"))
+	fmt.Printf("apiSuffix is %s\n", apiSuffix)
+	response, err := broker.sendRequest(apiSuffix, []byte{}, "", name)
 	if err != nil {
 		return "", err
 	}
@@ -72,7 +74,7 @@ func (dsClient DataSwapperClient) Get(
 	return fmt.Sprintf("%v", string(responseData[:])), nil
 }
 
-func (dsClient DataSwapperClient) sendRequest(
+func (broker *BrokerClient) sendRequest(
 	apiSuffix string,
 	data []byte,
 	contentType string,
@@ -80,10 +82,10 @@ func (dsClient DataSwapperClient) sendRequest(
 
 	// Construct URL
 	var url string
-	if strings.HasPrefix(dsClient.url, "http://") {
-		url = fmt.Sprintf("%s/%s", dsClient.url, apiSuffix)
+	if strings.HasPrefix(broker.url, "http://") {
+		url = fmt.Sprintf("%s/%s", broker.url, apiSuffix)
 	} else {
-		url = fmt.Sprintf("http://%s/%s", dsClient.url, apiSuffix)
+		url = fmt.Sprintf("http://%s/%s", broker.url, apiSuffix)
 	}
 
 	// Send request to validator URL
@@ -113,13 +115,13 @@ func (dsClient DataSwapperClient) sendRequest(
 	return string(reponseBody), nil
 }
 
-func (dsClient DataSwapperClient) getStatus(
+func (broker *BrokerClient) getStatus(
 	batchId string, wait uint) (string, error) {
 
 	// API to call
 	apiSuffix := fmt.Sprintf("%s?id=%s&wait=%d",
 		BATCH_STATUS_API, batchId, wait)
-	response, err := dsClient.sendRequest(apiSuffix, []byte{}, "", "")
+	response, err := broker.sendRequest(apiSuffix, []byte{}, "", "")
 	if err != nil {
 		return "", err
 	}
@@ -134,27 +136,33 @@ func (dsClient DataSwapperClient) getStatus(
 	return fmt.Sprint(entry["status"]), nil
 }
 
-func (dsClient DataSwapperClient) sendTransaction(
-	action string, key string, value string, wait uint) (string, error) {
+func (broker *BrokerClient) sendTransaction(
+	function string, key string, value string, wait uint) (string, error) {
 
 	// construct the payload information in CBOR format
 	payloadData := make(map[string]interface{})
-	payloadData["Action"] = action
-	payloadData["Key"] = key
-	payloadData["Value"] = value
-	payload := fmt.Sprintf("%s,%s,%s", payloadData["Action"], payloadData["Key"], payloadData["Value"])
-
+	payloadData["Function"] = function
+	args := make([]string, 0)
+	args = append(args, key, value)
+	//payloadData["Key"] = [key, value]
+	payloadData["Parameter"] = args
+	//payload := fmt.Sprintf("%s,%s,%s", payloadData["Action"], payloadData["Key"], payloadData["Value"])
+	payload, err := json.Marshal(payloadData)
+	if err != nil {
+		return "", err
+	}
 	// construct the address
-	address := dsClient.getAddress(key)
-
+	address := broker.getAddress(key, "regular")
+	fmt.Printf("send %v\n", string(payload))
+	fmt.Printf("get address hash %v\n", address)
 	// Construct TransactionHeader
 	rawTransactionHeader := transaction_pb2.TransactionHeader{
-		SignerPublicKey:  dsClient.signer.GetPublicKey().AsHex(),
+		SignerPublicKey:  broker.signer.GetPublicKey().AsHex(),
 		FamilyName:       FAMILY_NAME,
 		FamilyVersion:    FAMILY_VERSION,
 		Dependencies:     []string{}, // empty dependency list
 		Nonce:            strconv.Itoa(rand.Int()),
-		BatcherPublicKey: dsClient.signer.GetPublicKey().AsHex(),
+		BatcherPublicKey: broker.signer.GetPublicKey().AsHex(),
 		Inputs:           []string{address},
 		Outputs:          []string{address},
 		PayloadSha512:    Sha512HashValue(string(payload)),
@@ -167,7 +175,7 @@ func (dsClient DataSwapperClient) sendTransaction(
 
 	// Signature of TransactionHeader
 	transactionHeaderSignature := hex.EncodeToString(
-		dsClient.signer.Sign(transactionHeader))
+		broker.signer.Sign(transactionHeader))
 
 	// Construct Transaction
 	transaction := transaction_pb2.Transaction{
@@ -177,7 +185,7 @@ func (dsClient DataSwapperClient) sendTransaction(
 	}
 
 	// Get BatchList
-	rawBatchList, err := dsClient.createBatchList(
+	rawBatchList, err := broker.createBatchList(
 		[]*transaction_pb2.Transaction{&transaction})
 	if err != nil {
 		return "", errors.New(
@@ -193,13 +201,13 @@ func (dsClient DataSwapperClient) sendTransaction(
 	if wait > 0 {
 		waitTime := uint(0)
 		startTime := time.Now()
-		response, err := dsClient.sendRequest(
+		response, err := broker.sendRequest(
 			BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, key)
 		if err != nil {
 			return "", err
 		}
 		for waitTime < wait {
-			status, err := dsClient.getStatus(batchId, wait-waitTime)
+			status, err := broker.getStatus(batchId, wait-waitTime)
 			if err != nil {
 				return "", err
 			}
@@ -211,21 +219,21 @@ func (dsClient DataSwapperClient) sendTransaction(
 		return response, nil
 	}
 
-	return dsClient.sendRequest(
+	return broker.sendRequest(
 		BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, key)
 }
 
-func (dsClient DataSwapperClient) getPrefix() string {
+func (broker *BrokerClient) getPrefix() string {
 	return Sha512HashValue(FAMILY_NAME)[:FAMILY_NAMESPACE_ADDRESS_LENGTH]
 }
 
-func (dsClient DataSwapperClient) getAddress(name string) string {
-	prefix := dsClient.getPrefix()
-	nameAddress := Sha512HashValue(name)[:FAMILY_VERB_ADDRESS_LENGTH]
+func (broker *BrokerClient) getAddress(name string, typeValue string) string {
+	prefix := broker.getPrefix()
+	nameAddress := Sha512HashValue(typeValue + name)[:FAMILY_VERB_ADDRESS_LENGTH]
 	return prefix + nameAddress
 }
 
-func (dsClient DataSwapperClient) createBatchList(
+func (broker *BrokerClient) createBatchList(
 	transactions []*transaction_pb2.Transaction) (batch_pb2.BatchList, error) {
 
 	// Get list of TransactionHeader signatures
@@ -237,7 +245,7 @@ func (dsClient DataSwapperClient) createBatchList(
 
 	// Construct BatchHeader
 	rawBatchHeader := batch_pb2.BatchHeader{
-		SignerPublicKey: dsClient.signer.GetPublicKey().AsHex(),
+		SignerPublicKey: broker.signer.GetPublicKey().AsHex(),
 		TransactionIds:  transactionSignatures,
 	}
 	batchHeader, err := proto.Marshal(&rawBatchHeader)
@@ -248,7 +256,7 @@ func (dsClient DataSwapperClient) createBatchList(
 
 	// Signature of BatchHeader
 	batchHeaderSignature := hex.EncodeToString(
-		dsClient.signer.Sign(batchHeader))
+		broker.signer.Sign(batchHeader))
 
 	// Construct Batch
 	batch := batch_pb2.Batch{

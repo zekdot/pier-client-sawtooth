@@ -3,6 +3,7 @@ package state
 import (
 	"crypto/sha512"
 	"encoding/hex"
+	"fmt"
 	"github.com/hyperledger/sawtooth-sdk-go/processor"
 	"strings"
 )
@@ -29,6 +30,7 @@ func (broker *BrokerState)GetMetaData(key string) (string, error) {
 	data, ok := broker.addressCache[address]
 	if ok {
 		if broker.addressCache[address] != nil {
+			fmt.Print("hit in cache")
 			return string(data), nil
 		}
 	}
@@ -58,6 +60,7 @@ func (broker *BrokerState)GetData(key string) (string, error) {
 	data, ok := broker.addressCache[address]
 	if ok {
 		if broker.addressCache[address] != nil {
+			fmt.Print("hit in cache")
 			return string(data), nil
 		}
 	}
@@ -74,6 +77,7 @@ func (broker *BrokerState) SetData(key string, value string) error {
 	data := []byte(value)
 	// 进行缓存
 	broker.addressCache[address] = data
+	fmt.Printf("will save %s to %s", value, address)
 	// 存储进账本中
 	_, err := broker.context.SetState(map[string][] byte {
 		address: data,
@@ -83,6 +87,7 @@ func (broker *BrokerState) SetData(key string, value string) error {
 
 // split regular data and meta
 func makeAddress(name string, typeValue string) string {
+	fmt.Printf("get digest of %s", (typeValue + name))
 	return Namespace + hexdigest(typeValue + name)[:64]
 }
 

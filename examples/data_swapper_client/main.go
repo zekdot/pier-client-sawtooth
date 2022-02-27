@@ -47,7 +47,7 @@ func main() {
 
 	var opts Opts
 	parser := flags.NewParser(&opts, flags.Default)
-	parser.Command.Name = "data_swapper"
+	parser.Command.Name = "broker"
 
 	// Add sub-commands
 	commands := []Command{
@@ -111,7 +111,7 @@ func Sha512HashValue(value string) string {
 	return strings.ToLower(hex.EncodeToString(hashHandler.Sum(nil)))
 }
 
-func GetClient(args Command, readFile bool) (DataSwapperClient, error) {
+func GetClient(args Command, readFile bool) (*BrokerClient, error) {
 	url := args.UrlPassed()
 	if url == "" {
 		url = DEFAULT_URL
@@ -120,11 +120,12 @@ func GetClient(args Command, readFile bool) (DataSwapperClient, error) {
 	if readFile {
 		var err error
 		keyfile, err = GetKeyfile(args.KeyfilePassed())
+		fmt.Printf("keyFile is %s", keyfile)
 		if err != nil {
-			return DataSwapperClient{}, err
+			return &BrokerClient{}, err
 		}
 	}
-	return NewDataSwapperClient(url, keyfile)
+	return NewBrokerClient(url, keyfile)
 }
 
 func GetKeyfile(keyfile string) (string, error) {
