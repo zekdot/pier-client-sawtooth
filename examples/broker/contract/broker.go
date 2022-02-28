@@ -10,7 +10,7 @@ import (
 const (
 	innerMeta = "inner-meta"
 	outterMeta = "outter-meta"
-	callbackMeta = "callback=meta"
+	callbackMeta = "callback-meta"
 	delimiter = "&"
 )
 
@@ -39,13 +39,23 @@ func NewBroker() *Broker {
 //}
 
 func (broker *Broker)Init(state *state.BrokerState) error {
+	fmt.Println("start init")
 	inCounter := make(map[string]uint64)
 	outCounter := make(map[string]uint64)
 	callbackCounter := make(map[string]uint64)
 
-	broker.putMap(state, innerMeta, inCounter)
-	broker.putMap(state, outterMeta, outCounter)
-	broker.putMap(state, callbackMeta, callbackCounter)
+	err := broker.putMap(state, innerMeta, inCounter)
+	if err != nil {
+		return err
+	}
+	err = broker.putMap(state, outterMeta, outCounter)
+	if err != nil {
+		return err
+	}
+	err = broker.putMap(state, callbackMeta, callbackCounter)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

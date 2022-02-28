@@ -2,6 +2,7 @@ package main
 
 import (
 	bytes2 "bytes"
+	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -19,7 +20,13 @@ import (
 	"strings"
 	"time"
 )
-
+// Read method:
+// 	GetInnerMetaMethod    = "getInnerMeta"    // get last index of each source chain executing tx
+//	GetOutMetaMethod      = "getOuterMeta"    // get last index of each receiving chain crosschain event
+//	GetCallbackMetaMethod = "getCallbackMeta" // get last index of each receiving chain callback tx
+//	GetInMessageMethod    = "getInMessage"
+//	GetOutMessageMethod   = "getOutMessage"
+//	PollingEventMethod    = "PollingEvent"
 type BrokerClient struct {
 	url string
 	signer *signing.Signer
@@ -44,9 +51,136 @@ func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 	return &BrokerClient{url, signer}, nil
 }
 
-func (broker *BrokerClient) Set(
-	key string, value string, wait uint) (string, error) {
-	return broker.sendTransaction("set", key, value, wait)
+//func (broker *BrokerClient) Set(
+//	key string, value string, wait uint) (string, error) {
+//	return broker.sendTransaction("set", key, value, wait)
+//}
+func (broker *BrokerClient) getMeta(function string) (string, error) {
+	var key string
+	switch function {
+	case "getInnerMeta":
+		key = "inner-meta"
+		break
+	case "getOuterMeta":
+		key = "outter-meta"
+		break
+	case "getCallbackMeta":
+		key = "callback-meta"
+		break
+	default:
+		return "", fmt.Errorf("no such operation")
+	}
+	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, broker.getAddress(key, "meta"))
+	fmt.Println("get data from " + apiSuffix)
+	response, err := broker.sendRequest(apiSuffix, []byte{}, "", key)
+	if err != nil {
+		return "", err
+	}
+	responseMap := make(map[interface{}]interface{})
+	err = yaml.Unmarshal([]byte(response), &responseMap)
+	if err != nil {
+		return "", errors.New(fmt.Sprint("Error reading response: %v", err))
+	}
+	data, ok := responseMap["data"].(string)
+	if !ok {
+		return "", errors.New("Error reading as string")
+	}
+	responseData, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return "", errors.New(fmt.Sprint("Error decoding response: %v", err))
+	}
+	return string(responseData[:]), nil
+}
+
+func (broker *BrokerClient) getMessage(function string, addr string, index string) (string, error) {
+	// concat key
+	//if len(args) < 2 {
+	//	return "", fmt.Errorf("insufficent paramater, need sourceChainId, index")
+	//}
+	var key string
+	switch function {
+	case "getInMessage":
+		key = fmt.Sprintf("in-msg-%s-%s", addr, index)
+		break
+	case "getOutMessage":
+		key = fmt.Sprintf("out-msg-%s-%s", addr, index)
+		break
+	}
+	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, broker.getAddress(key, "meta"))
+	response, err := broker.sendRequest(apiSuffix, []byte{}, "", key)
+	if err != nil {
+		return "", err
+	}
+	responseMap := make(map[interface{}]interface{})
+	err = yaml.Unmarshal([]byte(response), &responseMap)
+	if err != nil {
+		return "", errors.New(fmt.Sprint("Error reading response: %v", err))
+	}
+	data, ok := responseMap["data"].(string)
+	if !ok {
+		return "", errors.New("Error reading as string")
+	}
+	responseData, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return "", errors.New(fmt.Sprint("Error decoding response: %v", err))
+	}
+	return string(responseData[:]), nil
+}
+
+type Event struct {
+	Index         uint64 `json:"index"`
+	DstChainID    string `json:"dst_chain_id"`
+	SrcContractID string `json:"src_contract_id"`
+	DstContractID string `json:"dst_contract_id"`
+	Func          string `json:"func"`
+	Args          string `json:"args"`
+	Callback      string `json:"callback"`
+	Proof         []byte `json:"proof"`
+	Extra         []byte `json:"extra"`
+}
+
+func (broker *BrokerClient) pollingEvent(mStr string) (string, error) {
+	m := make(map[string]uint64)
+	if err := json.Unmarshal([]byte(mStr), &m); err != nil {
+		return "", err
+		//return shim.Error(fmt.Errorf("unmarshal out meta: %s", err).Error())
+	}
+	outMetaStr, err := broker.getMeta("getOuterMeta")
+	if err != nil {
+		return "", err
+	}
+	outMeta := make(map[string]uint64)
+	if err := json.Unmarshal([]byte(outMetaStr), &outMeta); err != nil {
+		return "", err
+		//return shim.Error(fmt.Errorf("unmarshal out meta: %s", err).Error())
+	}
+	events := make([]*Event, 0)
+	for addr, idx := range outMeta {
+		startPos, ok := m[addr]
+		if !ok {
+			startPos = 0
+		}
+		for i := startPos + 1; i <= idx; i++ {
+			outMesageStr, err := broker.getMessage("getOutMessage", addr, strconv.FormatUint(i, 10))
+			if err != nil {
+				fmt.Printf("get out event by key %s fail", "out-" + addr + "-" + strconv.FormatUint(i, 10))
+				continue
+			}
+			e := &Event{}
+			if err := json.Unmarshal([]byte(outMesageStr), e); err != nil {
+				fmt.Println("unmarshal event fail")
+				continue
+			}
+			events = append(events, e)
+		}
+	}
+	//ret, err := json.Marshal(events)
+
+	eventStr, err := json.Marshal(events)
+	if err != nil {
+		return "", err
+	}
+	return string(eventStr), nil
 }
 
 func (broker *BrokerClient) Get(
@@ -101,7 +235,7 @@ func (broker *BrokerClient) sendRequest(
 			fmt.Sprintf("Failed to connect to REST API: %v", err))
 	}
 	if response.StatusCode == 404 {
-		logger.Debug(fmt.Sprintf("%v", response))
+		//logger.Debug(fmt.Sprintf("%v", response))
 		return "", errors.New(fmt.Sprintf("No such key: %s", name))
 	} else if response.StatusCode >= 400 {
 		return "", errors.New(
@@ -269,4 +403,11 @@ func (broker *BrokerClient) createBatchList(
 	return batch_pb2.BatchList{
 		Batches: []*batch_pb2.Batch{&batch},
 	}, nil
+}
+
+
+func Sha512HashValue(value string) string {
+	hashHandler := sha512.New()
+	hashHandler.Write([]byte(value))
+	return strings.ToLower(hex.EncodeToString(hashHandler.Sum(nil)))
 }

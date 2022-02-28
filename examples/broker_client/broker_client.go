@@ -44,6 +44,98 @@ func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 	return &BrokerClient{url, signer}, nil
 }
 
+func (broker *BrokerClient) Init(wait uint) (string, error) {
+	rand.Seed(time.Now().Unix())
+	// construct the payload information in CBOR format
+	payloadData := make(map[string]interface{})
+	payloadData["Function"] = "init"
+	args := make([]string, 0)
+	//payloadData["Key"] = [key, value]
+	payloadData["Parameter"] = append(args, strconv.Itoa(rand.Int()))
+	//payload := fmt.Sprintf("%s,%s,%s", payloadData["Action"], payloadData["Key"], payloadData["Value"])
+	payload, err := json.Marshal(payloadData)
+	if err != nil {
+		return "", err
+	}
+	// construct the address
+	address := broker.getAddress("inner-meta", "meta")
+	fmt.Println("local calc address is " + address)
+	fmt.Printf("send %v\n", string(payload))
+	//fmt.Printf("get address hash %v\n", address)
+	// Construct TransactionHeader
+	rawTransactionHeader := transaction_pb2.TransactionHeader{
+		SignerPublicKey:  broker.signer.GetPublicKey().AsHex(),
+		FamilyName:       FAMILY_NAME,
+		FamilyVersion:    FAMILY_VERSION,
+		Dependencies:     []string{}, // empty dependency list
+		Nonce:            strconv.Itoa(rand.Int()),
+		BatcherPublicKey: broker.signer.GetPublicKey().AsHex(),
+		Inputs:           []string{
+			broker.getAddress("inner-meta", "meta"),
+			broker.getAddress("outter-meta", "meta"),
+			broker.getAddress("callback-meta", "meta")},
+		Outputs:          []string{
+			broker.getAddress("inner-meta", "meta"),
+			broker.getAddress("outter-meta", "meta"),
+			broker.getAddress("callback-meta", "meta")},
+		PayloadSha512:    Sha512HashValue(string(payload)),
+	}
+	transactionHeader, err := proto.Marshal(&rawTransactionHeader)
+	if err != nil {
+		return "", errors.New(
+			fmt.Sprintf("Unable to serialize transaction header: %v", err))
+	}
+
+	// Signature of TransactionHeader
+	transactionHeaderSignature := hex.EncodeToString(
+		broker.signer.Sign(transactionHeader))
+
+	// Construct Transaction
+	transaction := transaction_pb2.Transaction{
+		Header:          transactionHeader,
+		HeaderSignature: transactionHeaderSignature,
+		Payload:         []byte(payload),
+	}
+
+	// Get BatchList
+	rawBatchList, err := broker.createBatchList(
+		[]*transaction_pb2.Transaction{&transaction})
+	if err != nil {
+		return "", errors.New(
+			fmt.Sprintf("Unable to construct batch list: %v", err))
+	}
+	batchId := rawBatchList.Batches[0].HeaderSignature
+	batchList, err := proto.Marshal(&rawBatchList)
+	if err != nil {
+		return "", errors.New(
+			fmt.Sprintf("Unable to serialize batch list: %v", err))
+	}
+
+	if wait > 0 {
+		waitTime := uint(0)
+		startTime := time.Now()
+		response, err := broker.sendRequest(
+			BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, "init")
+		if err != nil {
+			return "", err
+		}
+		for waitTime < wait {
+			status, err := broker.getStatus(batchId, wait-waitTime)
+			if err != nil {
+				return "", err
+			}
+			waitTime = uint(time.Now().Sub(startTime))
+			if status != "PENDING" {
+				return response, nil
+			}
+		}
+		return response, nil
+	}
+
+	return broker.sendRequest(
+		BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, "init")
+}
+
 func (broker *BrokerClient) Set(
 	key string, value string, wait uint) (string, error) {
 	return broker.sendTransaction("set", key, value, wait)
@@ -75,6 +167,7 @@ func (broker *BrokerClient) Get(
 }
 
 func (broker *BrokerClient) sendRequest(
+
 	apiSuffix string,
 	data []byte,
 	contentType string,
@@ -138,12 +231,13 @@ func (broker *BrokerClient) getStatus(
 
 func (broker *BrokerClient) sendTransaction(
 	function string, key string, value string, wait uint) (string, error) {
-
+	rand.Seed(time.Now().Unix())
 	// construct the payload information in CBOR format
 	payloadData := make(map[string]interface{})
 	payloadData["Function"] = function
 	args := make([]string, 0)
-	args = append(args, key, value)
+	// don't know why
+	args = append(args, key, value, strconv.Itoa(rand.Int()))
 	//payloadData["Key"] = [key, value]
 	payloadData["Parameter"] = args
 	//payload := fmt.Sprintf("%s,%s,%s", payloadData["Action"], payloadData["Key"], payloadData["Value"])

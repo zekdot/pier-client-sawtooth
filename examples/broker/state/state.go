@@ -47,6 +47,7 @@ func (broker *BrokerState) SetMetaData(key string, value string) error {
 	data := []byte(value)
 	// 进行缓存
 	//broker.addressCache[address] = data
+	fmt.Printf("will save %s to %s\n", data, address)
 	// 存储进账本中
 	_, err := broker.context.SetState(map[string][] byte {
 		address: data,
@@ -87,7 +88,7 @@ func (broker *BrokerState) SetData(key string, value string) error {
 
 // split regular data and meta
 func makeAddress(name string, typeValue string) string {
-	fmt.Printf("get digest of %s", (typeValue + name))
+	fmt.Printf("get digest of %s\n", (typeValue + name))
 	return Namespace + hexdigest(typeValue + name)[:64]
 }
 

@@ -15,8 +15,7 @@ func (broker *Broker)putMap(state *state.BrokerState, metaName string, meta map[
 	if err != nil {
 		return err
 	}
-	state.SetMetaData(metaName, string(metaBytes))
-	return nil
+	return state.SetMetaData(metaName, string(metaBytes))
 }
 
 func(broker *Broker)getMap(state *state.BrokerState, metaName string) (map[string]uint64, error) {

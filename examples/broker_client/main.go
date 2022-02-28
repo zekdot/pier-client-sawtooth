@@ -53,6 +53,7 @@ func main() {
 	commands := []Command{
 		&Set{},
 		&Get{},
+		&Init{},
 	}
 	for _, cmd := range commands {
 		err := cmd.Register(parser.Command)

@@ -19,7 +19,7 @@ func FromBytes(payloadData[] byte) (*BrokerPayload, error) {
 	if err := json.Unmarshal(payloadData, payload); err != nil {
 		return nil, err
 	}
-
+	payload.Parameter = payload.Parameter[0:len(payload.Parameter) - 1]
 	if len(payload.Function) < 1 {
 		return nil, &processor.InvalidTransactionError{Msg: "Function is required"}
 	}
