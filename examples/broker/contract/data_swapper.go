@@ -7,21 +7,21 @@ import (
 	"strings"
 )
 
-func(broker *Broker) Get(state *state.BrokerState, args []string)(string, error) {
-	switch len(args) {
-	case 1:
-		data, err := state.GetData(args[0])
-		if err != nil {
-			return "", err
-		}
-		return data, nil
-	case 3:
-		err := broker.InterchainDataSwapInvoke(state, args[0], args[1], args[2])
-		return "", err
-	default:
-		return "", fmt.Errorf("incorrect number of arguments")
-	}
-}
+//func(broker *Broker) Get(state *state.BrokerState, args []string)(string, error) {
+//	switch len(args) {
+//	case 1:
+//		data, err := state.GetData(args[0])
+//		if err != nil {
+//			return "", err
+//		}
+//		return data, nil
+//	case 3:
+//		err := broker.InterchainDataSwapInvoke(state, args[0], args[1], args[2])
+//		return "", err
+//	default:
+//		return "", fmt.Errorf("incorrect number of arguments")
+//	}
+//}
 
 func (broker *Broker) Set(state *state.BrokerState, args []string) error {
 	if len(args) != 2 {

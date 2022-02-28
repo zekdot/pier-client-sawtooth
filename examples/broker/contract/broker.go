@@ -38,26 +38,26 @@ func NewBroker() *Broker {
 //	return broker.init
 //}
 
-func (broker *Broker)Init(state *state.BrokerState) error {
-	fmt.Println("start init")
-	inCounter := make(map[string]uint64)
-	outCounter := make(map[string]uint64)
-	callbackCounter := make(map[string]uint64)
-
-	err := broker.putMap(state, innerMeta, inCounter)
-	if err != nil {
-		return err
-	}
-	err = broker.putMap(state, outterMeta, outCounter)
-	if err != nil {
-		return err
-	}
-	err = broker.putMap(state, callbackMeta, callbackCounter)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+//func (broker *Broker)Init(state *state.BrokerState) error {
+//	fmt.Println("start init")
+//	inCounter := make(map[string]uint64)
+//	outCounter := make(map[string]uint64)
+//	callbackCounter := make(map[string]uint64)
+//
+//	err := broker.putMap(state, innerMeta, inCounter)
+//	if err != nil {
+//		return err
+//	}
+//	err = broker.putMap(state, outterMeta, outCounter)
+//	if err != nil {
+//		return err
+//	}
+//	err = broker.putMap(state, callbackMeta, callbackCounter)
+//	if err != nil {
+//		return err
+//	}
+//	return nil
+//}
 
 func (broker *Broker) InterchainDataSwapInvoke(state *state.BrokerState, toId string, contractId string, key string) error {
 	//if len

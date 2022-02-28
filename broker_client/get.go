@@ -39,7 +39,7 @@ func (args *Get) Run() error {
 	if err != nil {
 		return err
 	}
-	value, err := dsClient.Get(name)
+	value, err := dsClient.GetData(name)
 	if err != nil {
 		return err
 	}

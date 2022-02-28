@@ -5,30 +5,30 @@ import (
 	"encoding/json"
 )
 
-func (broker *Broker) GetOutterMeta(state *state.BrokerState)(map[string]uint64, error) {
-	meta, err := broker.getMap(state, outterMeta)
-	if err != nil {
-		return nil, err
-	}
-	return meta, nil
-}
-
-func (broker *Broker) GetInnerMeta(state *state.BrokerState) (map[string]uint64, error) {
-	meta, err := broker.getMap(state, innerMeta)
-	if err != nil {
-		return nil, err
-	}
-	return meta, nil
-}
-
-func (broker *Broker) GetCallbackMeta(state *state.BrokerState) (map[string]uint64, error) {
-	meta, err := broker.getMap(state, callbackMeta)
-	if err != nil {
-		return nil, err
-	}
-	return meta, nil
-}
-
+//func (broker *Broker) GetOutterMeta(state *state.BrokerState)(map[string]uint64, error) {
+//	meta, err := broker.getMap(state, outterMeta)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return meta, nil
+//}
+//
+//func (broker *Broker) GetInnerMeta(state *state.BrokerState) (map[string]uint64, error) {
+//	meta, err := broker.getMap(state, innerMeta)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return meta, nil
+//}
+//
+//func (broker *Broker) GetCallbackMeta(state *state.BrokerState) (map[string]uint64, error) {
+//	meta, err := broker.getMap(state, callbackMeta)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return meta, nil
+//}
+//
 func (broker *Broker) GetOutMessage(state *state.BrokerState, destchainID string, sequenceNum string)(*Event, error) {
 	key := outMsgKey(destchainID, sequenceNum)
 	v, err := state.GetMetaData(key)

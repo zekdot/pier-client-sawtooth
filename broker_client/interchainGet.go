@@ -1,12 +1,14 @@
 package main
 
-import "github.com/jessevdk/go-flags"
+import (
+	"github.com/jessevdk/go-flags"
+)
 
 type InterchainGet struct {
 	Args struct {
 		TargetChainId  string `positional-arg-name:"tid" required:"true" description:"target pier id"`
 		CCid string `positional-arg-name:"ccid" required:"true" description:"target contract's address"`
-		Key string `positional-arg-name:"key" required:"true" description: value's key"`
+		Key string `positional-arg-name:"key" required:"true" description:"value's key"`
 	} `positional-args:"true"`
 	Url     string `long:"url" description:"Specify URL of REST API"`
 	Keyfile string `long:"keyfile" description:"Identify file containing user's private key"`
@@ -26,7 +28,7 @@ func (args *InterchainGet) UrlPassed() string {
 }
 
 func (args *InterchainGet) Register(parent *flags.Command) error {
-	_, err := parent.AddCommand(args.Name(), "init meta value", "Sends an dsswapper transaction to set <name> to <value>.", args)
+	_, err := parent.AddCommand(args.Name(), "ff", "ff", args)
 	if err != nil {
 		return err
 	}
@@ -35,14 +37,16 @@ func (args *InterchainGet) Register(parent *flags.Command) error {
 
 func (args *InterchainGet) Run() error {
 	// Construct client
-	//name := args.Args.Name
-	//value := args.Args.Value
-	wait := args.Wait
+	toId := args.Args.TargetChainId
+	cid := args.Args.CCid
+	key := args.Args.Key
+	//fmt.Printf("%s %s %s\n", toId, cid, key)
+	//wait := args.Wait
 
 	dsClient, err := GetClient(args, true)
 	if err != nil {
 		return err
 	}
-	_, err = dsClient.Init(wait)
+	err = dsClient.InterchainGet(toId, cid, key)
 	return err
 }

@@ -11,23 +11,20 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="30164547-2db0-4d99-a8a4-2ef0521b526a" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/broker_client/broker_client.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/broker_client/constants.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/broker_client/get.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/broker_client/init.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/broker_client/interchainGet.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/broker_client/main.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/broker_client/rpc_client.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/broker_client/set.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/broker_service/rpc_server.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/event.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_service/broker_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_service/broker_client.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_service/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_service/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client.go" beforeDir="false" afterPath="$PROJECT_DIR$/client.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ds_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/ds_client.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/broker_client.go" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/constants.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/constants.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/get.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/get.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/init.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/init.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/interchainGet.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/interchainGet.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/rpc_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/rpc_client.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/set.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/set.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/examples/broker/contract/broker.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/contract/broker.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/examples/broker/state/state.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/state/state.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/broker/contract/data_swapper.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/contract/data_swapper.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/broker/contract/helper.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/contract/helper.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/broker/contract/meta.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/contract/meta.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/examples/broker/handler/handler.go" beforeDir="false" afterPath="$PROJECT_DIR$/examples/broker/handler/handler.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

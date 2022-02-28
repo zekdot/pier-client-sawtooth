@@ -38,12 +38,12 @@ func (args *Init) Run() error {
 	// Construct client
 	//name := args.Args.Name
 	//value := args.Args.Value
-	wait := args.Wait
+	//wait := args.Wait
 
 	dsClient, err := GetClient(args, true)
 	if err != nil {
 		return err
 	}
-	_, err = dsClient.Init(wait)
+	err = dsClient.Init()
 	return err
 }

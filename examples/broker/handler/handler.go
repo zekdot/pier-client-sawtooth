@@ -50,9 +50,9 @@ func (handler *BrokerHandler) Apply(request *processor_pb2.TpProcessRequest, con
 
 	// Sawtooth server only need to finish write operation, read operation is implemented by client
 	switch payload.Function {
-	case "init":
+	//case "init":
 		//return nil
-		return broker.Init(brokerState)
+		//return broker.Init(brokerState)
 	case "InterchainDataSwapInvoke":
 		return broker.InterchainDataSwapInvoke(brokerState, args[0], args[1], args[2])
 	case "InterchainInvoke":

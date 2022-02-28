@@ -1,15 +1,12 @@
 package main
 
 import (
-	"crypto/sha512"
-	"encoding/hex"
 	"fmt"
 	"github.com/hyperledger/sawtooth-sdk-go/logging"
 	"github.com/jessevdk/go-flags"
 	"os"
 	"os/user"
 	"path"
-	"strings"
 )
 
 // All subcommands implement this interface
@@ -40,7 +37,7 @@ func main() {
 	arguments := os.Args[1:]
 	for _, arg := range arguments {
 		if arg == "-V" || arg == "--version" {
-			fmt.Println(DISTRIBUTION_NAME + " (Hyperledger Sawtooth) version " + DISTRIBUTION_VERSION)
+			//fmt.Println(DISTRIBUTION_NAME + " (Hyperledger Sawtooth) version " + DISTRIBUTION_VERSION)
 			os.Exit(0)
 		}
 	}
@@ -107,16 +104,27 @@ func main() {
 	fmt.Println("Error: Command not found: ", name)
 }
 
-func Sha512HashValue(value string) string {
-	hashHandler := sha512.New()
-	hashHandler.Write([]byte(value))
-	return strings.ToLower(hex.EncodeToString(hashHandler.Sum(nil)))
-}
+//func GetClient(args Command, readFile bool) (*BrokerClient, error) {
+//	url := args.UrlPassed()
+//	if url == "" {
+//		url = DEFAULT_URL
+//	}
+//	keyfile := ""
+//	if readFile {
+//		var err error
+//		keyfile, err = GetKeyfile(args.KeyfilePassed())
+//		fmt.Printf("keyFile is %s", keyfile)
+//		if err != nil {
+//			return &BrokerClient{}, err
+//		}
+//	}
+//	return NewBrokerClient(url, keyfile)
+//}
 
-func GetClient(args Command, readFile bool) (*BrokerClient, error) {
+func GetClient(args Command, readFile bool) (*RpcClient, error) {
 	url := args.UrlPassed()
 	if url == "" {
-		url = DEFAULT_URL
+		//url = DEFAULT_URL
 	}
 	keyfile := ""
 	if readFile {
@@ -124,10 +132,10 @@ func GetClient(args Command, readFile bool) (*BrokerClient, error) {
 		keyfile, err = GetKeyfile(args.KeyfilePassed())
 		fmt.Printf("keyFile is %s", keyfile)
 		if err != nil {
-			return &BrokerClient{}, err
+			return nil, err
 		}
 	}
-	return NewBrokerClient(url, keyfile)
+	return NewRpcClient(RPC_URL)
 }
 
 func GetKeyfile(keyfile string) (string, error) {
