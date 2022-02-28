@@ -2,13 +2,12 @@ package main
 
 import (
 	bytes2 "bytes"
-	"crypto/sha512"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gogo/protobuf/proto"
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/sawtooth-sdk-go/protobuf/batch_pb2"
 	"github.com/hyperledger/sawtooth-sdk-go/protobuf/transaction_pb2"
 	"github.com/hyperledger/sawtooth-sdk-go/signing"
@@ -45,41 +44,131 @@ func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 	return &BrokerClient{url, signer}, nil
 }
 
-// only need to fetch value according to the key
-func (broker *BrokerClient)getValue(key string) ([]byte, error) {
-	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, broker.getAddress(key))
-	fmt.Printf("apiSuffix is %s\n", apiSuffix)
-	response, err := broker.sendRequest(apiSuffix, []byte{}, "", key)
+// init will reset meta data
+func (broker *BrokerClient) Init(wait uint) (string, error) {
+	rand.Seed(time.Now().Unix())
+	// construct the payload information in CBOR format
+	payloadData := make(map[string]interface{})
+	payloadData["Function"] = "init"
+	args := make([]string, 0)
+	//payloadData["Key"] = [key, value]
+	payloadData["Parameter"] = append(args, strconv.Itoa(rand.Int()))
+	//payload := fmt.Sprintf("%s,%s,%s", payloadData["Action"], payloadData["Key"], payloadData["Value"])
+	payload, err := json.Marshal(payloadData)
 	if err != nil {
-		return nil, err
+		return "", err
+	}
+	// construct the address
+	address := broker.getAddress("inner-meta", "meta")
+	fmt.Println("local calc address is " + address)
+	fmt.Printf("send %v\n", string(payload))
+	//fmt.Printf("get address hash %v\n", address)
+	// Construct TransactionHeader
+	rawTransactionHeader := transaction_pb2.TransactionHeader{
+		SignerPublicKey:  broker.signer.GetPublicKey().AsHex(),
+		FamilyName:       FAMILY_NAME,
+		FamilyVersion:    FAMILY_VERSION,
+		Dependencies:     []string{}, // empty dependency list
+		Nonce:            strconv.Itoa(rand.Int()),
+		BatcherPublicKey: broker.signer.GetPublicKey().AsHex(),
+		Inputs:           []string{
+			broker.getAddress("inner-meta", "meta"),
+			broker.getAddress("outter-meta", "meta"),
+			broker.getAddress("callback-meta", "meta")},
+		Outputs:          []string{
+			broker.getAddress("inner-meta", "meta"),
+			broker.getAddress("outter-meta", "meta"),
+			broker.getAddress("callback-meta", "meta")},
+		PayloadSha512:    Sha512HashValue(string(payload)),
+	}
+	transactionHeader, err := proto.Marshal(&rawTransactionHeader)
+	if err != nil {
+		return "", errors.New(
+			fmt.Sprintf("Unable to serialize transaction header: %v", err))
+	}
+
+	// Signature of TransactionHeader
+	transactionHeaderSignature := hex.EncodeToString(
+		broker.signer.Sign(transactionHeader))
+
+	// Construct Transaction
+	transaction := transaction_pb2.Transaction{
+		Header:          transactionHeader,
+		HeaderSignature: transactionHeaderSignature,
+		Payload:         []byte(payload),
+	}
+
+	// Get BatchList
+	rawBatchList, err := broker.createBatchList(
+		[]*transaction_pb2.Transaction{&transaction})
+	if err != nil {
+		return "", errors.New(
+			fmt.Sprintf("Unable to construct batch list: %v", err))
+	}
+	batchId := rawBatchList.Batches[0].HeaderSignature
+	batchList, err := proto.Marshal(&rawBatchList)
+	if err != nil {
+		return "", errors.New(
+			fmt.Sprintf("Unable to serialize batch list: %v", err))
+	}
+
+	if wait > 0 {
+		waitTime := uint(0)
+		startTime := time.Now()
+		response, err := broker.sendRequest(
+			BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, "init")
+		if err != nil {
+			return "", err
+		}
+		for waitTime < wait {
+			status, err := broker.getStatus(batchId, wait-waitTime)
+			if err != nil {
+				return "", err
+			}
+			waitTime = uint(time.Now().Sub(startTime))
+			if status != "PENDING" {
+				return response, nil
+			}
+		}
+		return response, nil
+	}
+
+	return broker.sendRequest(
+		BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, "init")
+}
+
+func (broker *BrokerClient) Set(
+	key string, value string, wait uint) (string, error) {
+	return broker.sendTransaction("set", key, value, wait)
+}
+
+func (broker *BrokerClient) Get(
+	name string) (string, error) {
+	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, broker.getAddress(name, "regular"))
+	fmt.Printf("apiSuffix is %s\n", apiSuffix)
+	response, err := broker.sendRequest(apiSuffix, []byte{}, "", name)
+	if err != nil {
+		return "", err
 	}
 	responseMap := make(map[interface{}]interface{})
 
 	err = yaml.Unmarshal([]byte(response), &responseMap)
 	if err != nil {
-		return nil, errors.New(fmt.Sprint("Error reading response: %v", err))
+		return "", errors.New(fmt.Sprint("Error reading response: %v", err))
 	}
 	data, ok := responseMap["data"].(string)
 	if !ok {
-		return nil, errors.New("Error reading as string")
+		return "", errors.New("Error reading as string")
 	}
 	responseData, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
-		return nil, errors.New(fmt.Sprint("Error decoding response: %v", err))
+		return "", errors.New(fmt.Sprint("Error decoding response: %v", err))
 	}
-	return responseData[:], nil
-}
-
-// only need to set value according to the key and value
-func (broker *BrokerClient)setValue(key string, value string) error {
-	 _,err := broker.sendTransaction("set", key, value, 0)
-	 if err != nil {
-	 	return err
-	 }
-	 return nil
+	return fmt.Sprintf("%v", string(responseData[:])), nil
 }
 
 func (broker *BrokerClient) sendRequest(
+
 	apiSuffix string,
 	data []byte,
 	contentType string,
@@ -106,7 +195,7 @@ func (broker *BrokerClient) sendRequest(
 			fmt.Sprintf("Failed to connect to REST API: %v", err))
 	}
 	if response.StatusCode == 404 {
-		//logger.Debug(fmt.Sprintf("%v", response))
+		logger.Debug(fmt.Sprintf("%v", response))
 		return "", errors.New(fmt.Sprintf("No such key: %s", name))
 	} else if response.StatusCode >= 400 {
 		return "", errors.New(
@@ -148,6 +237,7 @@ func (broker *BrokerClient) sendTransaction(
 	payloadData := make(map[string]interface{})
 	payloadData["Function"] = function
 	args := make([]string, 0)
+	// don't know why
 	args = append(args, key, value, strconv.Itoa(rand.Int()))
 	//payloadData["Key"] = [key, value]
 	payloadData["Parameter"] = args
@@ -157,9 +247,9 @@ func (broker *BrokerClient) sendTransaction(
 		return "", err
 	}
 	// construct the address
-	address := broker.getAddress(key)
-	//fmt.Printf("send %v\n", string(payload))
-	//fmt.Printf("get address hash %v\n", address)
+	address := broker.getAddress(key, "regular")
+	fmt.Printf("send %v\n", string(payload))
+	fmt.Printf("get address hash %v\n", address)
 	// Construct TransactionHeader
 	rawTransactionHeader := transaction_pb2.TransactionHeader{
 		SignerPublicKey:  broker.signer.GetPublicKey().AsHex(),
@@ -228,6 +318,16 @@ func (broker *BrokerClient) sendTransaction(
 		BATCH_SUBMIT_API, batchList, CONTENT_TYPE_OCTET_STREAM, key)
 }
 
+func (broker *BrokerClient) getPrefix() string {
+	return Sha512HashValue(FAMILY_NAME)[:FAMILY_NAMESPACE_ADDRESS_LENGTH]
+}
+
+func (broker *BrokerClient) getAddress(name string, typeValue string) string {
+	prefix := broker.getPrefix()
+	nameAddress := Sha512HashValue(typeValue + name)[:FAMILY_VERB_ADDRESS_LENGTH]
+	return prefix + nameAddress
+}
+
 func (broker *BrokerClient) createBatchList(
 	transactions []*transaction_pb2.Transaction) (batch_pb2.BatchList, error) {
 
@@ -264,20 +364,4 @@ func (broker *BrokerClient) createBatchList(
 	return batch_pb2.BatchList{
 		Batches: []*batch_pb2.Batch{&batch},
 	}, nil
-}
-
-func Sha512HashValue(value string) string {
-	hashHandler := sha512.New()
-	hashHandler.Write([]byte(value))
-	return strings.ToLower(hex.EncodeToString(hashHandler.Sum(nil)))
-}
-
-func (broker *BrokerClient) getPrefix() string {
-	return Sha512HashValue(FAMILY_NAME)[:FAMILY_NAMESPACE_ADDRESS_LENGTH]
-}
-
-func (broker *BrokerClient) getAddress(name string) string {
-	prefix := broker.getPrefix()
-	nameAddress := Sha512HashValue(name)[:FAMILY_VERB_ADDRESS_LENGTH]
-	return prefix + nameAddress
 }

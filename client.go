@@ -2,70 +2,415 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"net/rpc"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/Rican7/retry"
+	"github.com/Rican7/retry/strategy"
+
+	//"github.com/hyperledger/fabric-protos-go/common"
+	//"github.com/hyperledger/fabric-protos-go/peer"
+	"github.com/hyperledger/fabric-sdk-go/pkg/client/channel"
+
+	"github.com/meshplus/bitxhub-kit/log"
 	"github.com/meshplus/bitxhub-model/pb"
 	"github.com/meshplus/pier/pkg/model"
 	"github.com/meshplus/pier/pkg/plugins/client"
-	"strings"
+	"github.com/sirupsen/logrus"
 )
 
-// 这里的定位是sawtooth的一个客户端，因此需要对接sawtooth-sdk的相关接口
-// 另外一方面，目前只需要从fabric向sawtooth中查询数据，因此本端暂时不需要主动发起交易，只需要完成接受相关的接口
-type Client struct {
-	eventC chan *pb.IBTP
-	pierId string
-	dsClient *DataSwapperClient	// 用于调用sawtooth交易族的客户端
-	outMeta map[string]uint64	// out计数器
-	inMeta map[string]uint64	// in计数器
-	callbackMeta map[string]uint64	// callback计数器
-	inMsgMap map[string]string	// 主动请求的消息
-}
+var logger = log.NewWithModule("client")
+
 var _ client.Client = (*Client)(nil)
-// 对方传过来的函数调用
-type CallFunc struct {
-	Func string   `json:"func"`
-	Args [][]byte `json:"args"`
+
+const (
+	GetInnerMetaMethod    = "getInnerMeta"    // get last index of each source chain executing tx
+	GetOutMetaMethod      = "getOuterMeta"    // get last index of each receiving chain crosschain event
+	GetCallbackMetaMethod = "getCallbackMeta" // get last index of each receiving chain callback tx
+	GetInMessageMethod    = "getInMessage"
+	GetOutMessageMethod   = "getOutMessage"
+	PollingEventMethod    = "pollingEvent"
+	FabricType            = "fabric2.0"
+)
+
+type Client struct {
+	//meta     *ContractMeta
+	//consumer *Consumer
+	eventC   chan *pb.IBTP
+	pierId   string
+	name     string
+	outMeta  map[string]uint64
+	ticker   *time.Ticker
+	done     chan bool
+	client *rpc.Client
 }
 
-// 初始化Plugin服务
 func NewClient(configPath, pierId string, extra []byte) (client.Client, error) {
-	// 造一个永远不会用的通道
+	// read config of fabric
+	//fabricConfig, err := UnmarshalConfig(configPath)
+
+	//if err != nil {
+	//	return nil, err
+	//}
+
 	eventC := make(chan *pb.IBTP)
-	c := &Client{}
-	// 初始化相关变量和计时器等
-	c.eventC = eventC
-	c.pierId = pierId
-	c.dsClient, _ = NewDataSwapperClient("http://127.0.0.1:8008", "/home/hzh/.sawtooth/keys/hzh.priv")
 
-	// 设置in、out和callback三个map
-	c.outMeta = make(map[string]uint64)
-	c.inMeta = make(map[string]uint64)
-	c.callbackMeta = make(map[string]uint64)
-	c.inMsgMap = make(map[string]string)
-	return c, nil
+	m := make(map[string]uint64)
+	if err := json.Unmarshal(extra, &m); err != nil {
+		return nil, fmt.Errorf("unmarshal extra for plugin :%w", err)
+	}
+	if m == nil {
+		m = make(map[string]uint64)
+	}
+
+	done := make(chan bool)
+
+	rpcClient, err := rpc.DialHTTP("tcp", "127.0.0.1:1212")
+	if err != nil {
+		logger.Fatal("dialing: ", err)
+	}
+
+	return &Client{
+		//consumer: csm,
+		eventC:   eventC,
+		//meta:     c,
+		pierId:   pierId,
+		name:     "sawtooth",// fabricConfig.Name,
+		outMeta:  m,
+		ticker:   time.NewTicker(2 * time.Second),
+		done:     done,
+		client: rpcClient,
+	}, nil
 }
-// 启动Plugin服务的接口
+
+type ReqArgs struct {
+	FuncName string
+	Args []string
+}
+
 func (c *Client) Start() error {
-	// 啥都不用干接口
-	// 采用轮询方式，定时从sawtooth中拉取数据
+	logger.Info("Fabric consumer started")
+	go c.polling()
 	//return c.consumer.Start()
-	// 从文件中读取出缓存
-	c.readMapFromFile("/home/hzh/bitxhub/sawtooth.txt")
 	return nil
 }
 
-// 停止Plugin服务的接口
+// polling event from broker
+func (c *Client) polling() {
+	for {
+		select {
+		case <-c.ticker.C:
+			args, err := json.Marshal(c.outMeta)
+			if err != nil {
+				logger.WithFields(logrus.Fields{
+					"error": err.Error(),
+				}).Error("Marshal outMeta of plugin")
+				continue
+			}
+			var reply string
+			reqArgs := ReqArgs{
+				PollingEventMethod,
+				[]string{string(args)},
+			}
+			err = c.client.Call("Service.EvaluateTransaction", reqArgs, &reply)
+
+			if err != nil {
+				logger.WithFields(logrus.Fields{
+					"error": err.Error(),
+				}).Error("Polling events from contract")
+				continue
+			}
+
+			evs := make([]*Event, 0)
+			if err := json.Unmarshal([]byte(reply), &evs); err != nil {
+				logger.WithFields(logrus.Fields{
+					"error": err.Error(),
+				}).Error("Unmarshal response payload")
+				continue
+			}
+			for _, ev := range evs {
+				//ev.Proof = proof
+				c.eventC <- ev.Convert2IBTP(c.pierId, pb.IBTP_INTERCHAIN)
+				if c.outMeta == nil {
+					c.outMeta = make(map[string]uint64)
+				}
+				c.outMeta[ev.DstChainID]++
+			}
+		case <-c.done:
+			logger.Info("Stop long polling")
+			return
+		}
+	}
+}
+
 func (c *Client) Stop() error {
-	// 啥都不用干接口
-	// 将三个meta和一个msgMap进行持久化存储到文件中
-	c.writeMapToFile("/home/hzh/bitxhub/sawtooth.txt")
+	c.ticker.Stop()
+	c.done <- true
+	//return c.consumer.Shutdown()
 	return nil
 }
 
-// Plugin负责将区块链上产生的跨链事件转化为标准的IBTP格式，Pier通过GetIBTP接口获取跨链请求再进行处理
+func (c *Client) Name() string {
+	return c.name
+}
+
+func (c *Client) Type() string {
+	return FabricType
+}
+
 func (c *Client) GetIBTP() chan *pb.IBTP {
 	return c.eventC
+}
+
+//func toPublicFunction(funcName string) string {
+//	var upperStr string
+//	vv := []rune(funcName)
+//	for i := 0; i < len(vv); i++ {
+//		if i == 0 {
+//			if vv[i] >= 97 && vv[i] <= 122 {
+//				vv[i] -= 32
+//				upperStr += string(vv[i])
+//			} else {
+//				fmt.Println("Not begins with lowercase letter,")
+//				return funcName
+//			}
+//		} else {
+//			upperStr += string(vv[i])
+//		}
+//	}
+//	return upperStr
+//}
+
+func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
+	pd := &pb.Payload{}
+	ret := &model.PluginResponse{}
+	if err := pd.Unmarshal(ibtp.Payload); err != nil {
+		return ret, fmt.Errorf("ibtp payload unmarshal: %w", err)
+	}
+	content := &pb.Content{}
+	if err := content.Unmarshal(pd.Content); err != nil {
+		return ret, fmt.Errorf("ibtp content unmarshal: %w", err)
+	}
+
+	//args := make([]string, len(content.Args) + 3)
+	//
+	//args = append(args, ibtp.From, strconv.FormatUint(ibtp.Index, 10), content.DstContractId)
+	//
+	args := []string {ibtp.From, strconv.FormatUint(ibtp.Index, 10), content.DstContractId}
+	//args := util.ToChaincodeArgs(ibtp.From, strconv.FormatUint(ibtp.Index, 10), content.DstContractId)
+	for i := 0; i < len(content.Args); i ++ {
+		args = append(args, string(content.Args[i]))
+	}
+
+	// DEBUG
+	fmt.Println("whole args is ")
+	for i, arg := range args {
+		fmt.Println(string(i) + arg + "!")
+	}
+	//funcName := toPublicFunction(content.Func)
+
+	fmt.Println("funcName is ", content.Func)
+	//args = append(args, content.Args...)
+	//request := channel.Request{
+	//	ChaincodeID: c.meta.CCID,
+	//	Fcn:         content.Func,
+	//	Args:        args,
+	//}
+
+	// retry executing
+	var res string
+	var proof []byte
+	var err error
+	if err := retry.Retry(func(attempt uint) error {
+		var reply string
+		reqArgs := ReqArgs{
+			content.Func,
+			args,
+		}
+		err = c.client.Call("Service.SubmitTransaction", reqArgs, &reply)
+		res = reply
+		//res, err = c.contract.SubmitTransaction(funcName, args...)
+		//res, err = c.consumer.ChannelClient.Execute(request)
+		if err != nil {
+			//if strings.Contains(err.Error(), "Chaincode status Code: (500)") {
+			//	res.ChaincodeStatus = shim.ERROR
+			//	return nil
+			//}
+			return fmt.Errorf("execute request: %w", err)
+		}
+
+		return nil
+	}, strategy.Wait(2*time.Second)); err != nil {
+		logger.Panicf("Can't send rollback ibtp back to bitxhub: %s", err.Error())
+	}
+
+	//response := &Response{}
+	//if err := json.Unmarshal(res.Payload, response); err != nil {
+	//	return nil, err
+	//}
+
+	// if there is callback function, parse returned value
+	result := toChaincodeArgs(strings.Split(res, ",")...)
+	newArgs := make([][]byte, 0)
+	ret.Status = true// response.OK
+	ret.Message = "success"// response.Message
+
+	// DEBUG
+	fmt.Println("content.DstContractId ID is " + content.DstContractId)
+	fmt.Println("content.Func is " + content.Func)
+	fmt.Println("content.Args is ")
+	for i, arg := range content.Args {
+		fmt.Println(string(i) + string(arg) + "!")
+	}
+
+	// If no callback function to invoke, then simply return
+	if content.Callback == "" {
+		return ret, nil
+	}
+
+	//proof, err = c.getProof(res)
+	proof = []byte("success")
+	//if err != nil {
+	//	return ret, err
+	//}
+
+	switch content.Func {
+	case "interchainGet":
+		newArgs = append(newArgs, content.Args[0])
+		newArgs = append(newArgs, result...)
+		//case "interchainCharge":
+		//	newArgs = append(newArgs, []byte(strconv.FormatBool(response.OK)), content.Args[0])
+		//	newArgs = append(newArgs, content.Args[2:]...)
+	}
+
+	ret.Result, err = c.generateCallback(ibtp, newArgs, proof)
+	if err != nil {
+		return nil, err
+	}
+
+	return ret, nil
+}
+
+func (c *Client) GetOutMessage(to string, idx uint64) (*pb.IBTP, error) {
+	var reply string
+	reqArgs := ReqArgs{
+		GetOutMessageMethod,
+		[]string{to, strconv.FormatUint(idx, 10)},
+	}
+	err := c.client.Call("Service.EvaluateTransaction", reqArgs, &reply)
+	//result, err := c.contract.EvaluateTransaction(GetOutMessageMethod, to, strconv.FormatUint(idx, 10))
+	if err != nil {
+		return nil, err
+	}
+	ret := &Event{}
+	if err := json.Unmarshal([]byte(reply), ret); err != nil {
+		return nil, err
+	}
+	return ret.Convert2IBTP(c.pierId, pb.IBTP_INTERCHAIN), nil
+	//return c.unpackIBTP(&response, pb.IBTP_INTERCHAIN)
+}
+
+func (c *Client) GetInMessage(from string, idx uint64) ([][]byte, error) {
+	var reply string
+	reqArgs := ReqArgs{
+		GetInMessageMethod,
+		[]string{from, strconv.FormatUint(idx, 10)},
+	}
+	err := c.client.Call("Service.EvaluateTransaction", reqArgs, &reply)
+	//result, err := c.contract.EvaluateTransaction(GetInMessageMethod, from, strconv.FormatUint(idx, 10))
+	if err != nil {
+		return nil, err
+	}
+	results := strings.Split(reply, ",")
+	return toChaincodeArgs(results...), nil
+}
+
+func (c *Client) GetInMeta() (map[string]uint64, error) {
+	var reply string
+	reqArgs := ReqArgs{
+		GetInnerMetaMethod,
+		[]string{},
+	}
+	err := c.client.Call("Service.EvaluateTransaction", reqArgs, &reply)
+	//result, err := c.contract.EvaluateTransaction(GetInnerMetaMethod)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]uint64)
+	err = json.Unmarshal([]byte(reply), &m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *Client) GetOutMeta() (map[string]uint64, error) {
+	var reply string
+	reqArgs := ReqArgs{
+		GetOutMetaMethod,
+		[]string{},
+	}
+	err := c.client.Call("Service.EvaluateTransaction", reqArgs, &reply)
+
+	//result, err := c.contract.EvaluateTransaction(GetOutMetaMethod)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]uint64)
+	err = json.Unmarshal([]byte(reply), &m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c Client) GetCallbackMeta() (map[string]uint64, error) {
+	var reply string
+	reqArgs := ReqArgs{
+		GetCallbackMetaMethod,
+		[]string{},
+	}
+	err := c.client.Call("Service.EvaluateTransaction", reqArgs, &reply)
+
+	//result, err := c.contract.EvaluateTransaction(GetCallbackMetaMethod)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]uint64)
+	err = json.Unmarshal([]byte(reply), &m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *Client) CommitCallback(ibtp *pb.IBTP) error {
+	return nil
+}
+
+func (c *Client) unpackIBTP(response *channel.Response, ibtpType pb.IBTP_Type) (*pb.IBTP, error) {
+	ret := &Event{}
+	if err := json.Unmarshal(response.Payload, ret); err != nil {
+		return nil, err
+	}
+
+	return ret.Convert2IBTP(c.pierId, ibtpType), nil
+}
+
+func (c *Client) unpackMap(response channel.Response) (map[string]uint64, error) {
+	if response.Payload == nil {
+		return nil, nil
+	}
+	r := make(map[string]uint64)
+	err := json.Unmarshal(response.Payload, &r)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal payload :%w", err)
+	}
+
+	return r, nil
 }
 
 // ToChaincodeArgs converts string args to []byte args
@@ -75,318 +420,4 @@ func toChaincodeArgs(args ...string) [][]byte {
 		bargs[i] = []byte(arg)
 	}
 	return bargs
-}
-
-// Plugin 负责执行来源链过来的跨链请求，Pier调用SubmitIBTP提交收到的跨链请求。
-
-// 主要方法，网关需要在这里进行数据的查取
-func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
-	pd := &pb.Payload{}
-	ret := &model.PluginResponse{}
-	if err := pd.Unmarshal(ibtp.Payload); err != nil {
-		return ret, fmt.Errorf("ibtp payload unmarshal: %w", err)
-	}
-	// content中包含要请求的各种参数等信息
-	content := &pb.Content{}
-	if err := content.Unmarshal(pd.Content); err != nil {
-		return ret, fmt.Errorf("ibtp content unmarshal: %w", err)
-	}
-	fmt.Println("content.DstContractId ID is " + content.DstContractId)
-	fmt.Println("content.Func is " + content.Func)
-	fmt.Println("content.Args is ")
-	for i, arg := range content.Args {
-		fmt.Println(string(i) + string(arg))
-	}
-	//logger.Info("submit ibtp", "id", ibtp.ID(), "contract", content.DstContractId, "func", content.Func)
-	//// 打印接受到的每一个参数
-	//for i, arg := range content.Args {
-	//	logger.Info("arg", strconv.Itoa(i), string(arg))
-	//}
-	// 目前只支持interchainGet方法
-	if content.Func != "interchainGet" {
-		return nil, errors.New("only support interchainGet")
-	}
-
-
-
-	// 主动发送的消息的回执？？这里应该不会遇到这种情况吧
-	//if ibtp.Category() == pb.IBTP_RESPONSE && content.Func == "" {
-	//	logger.Info("InvokeIndexUpdate", "ibtp", ibtp.ID())
-	//	_, resp, err := c.InvokeIndexUpdate(ibtp.From, ibtp.Index, ibtp.Category())
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	ret.Status = resp.OK
-	//	ret.Message = resp.Message
-	//
-	//	return ret, nil
-	//}
-	// 组装IBTP进行提交
-	// 调用应用链的相关方法获取到结果
-	var result [][]byte
-	//var chResp *channel.Response
-	callFunc := CallFunc{
-		Func: content.Func,
-		Args: content.Args,
-	}
-	bizData, err := json.Marshal(callFunc)
-	// 注意下面的区别！一个是InvokeIndexUpdate，另一个是InvokeInterchain，前者仅更新索引，后者则是实际调用InvokeInterchain方法
-	if err != nil {
-		fmt.Println("Marshal failed?")
-		// 如果序列化失败，全部都是失败之后要进行的操作，仅仅更新索引
-		ret.Status = false
-		ret.Message = fmt.Sprintf("marshal ibtp %s func %s and args: %s", ibtp.ID(), callFunc.Func, err.Error())
-
-		// 简单更新下索引好了，啥都不干
-		c.InvokeIndexUpdate(ibtp.From, ibtp.Index)
-		if err != nil {
-			return nil, err
-		}
-		//chResp = res
-	} else {
-		fmt.Println("Marshal success!")
-		// 需要调用链码并且获取结果，需要Response结构作为返回值
-		resp, err := c.InvokeInterchain(ibtp.From, ibtp.Index, content.DstContractId, bizData)
-		if err != nil {
-			return nil, fmt.Errorf("invoke interchain for ibtp %s to call %s: %w", ibtp.ID(), content.Func, err)
-		}
-		// 以上是调用交易族并获取结果的逻辑
-		ret.Status = true
-		ret.Message = "success"
-
-		// if there is callback function, parse returned value
-		result = toChaincodeArgs(strings.Split(resp, ",")...)
-		//chResp = res
-	}
-
-	// If is response IBTP, then simply return
-	//if ibtp.Category() == pb.IBTP_RESPONSE {
-	//	return ret, nil
-	//}
-	// proof简单来说就是在该链上查到的一个序列号，证明在本链中成功执行了交易，需要从sawtooth的api来找到获取方法，这里我们直接返回一个success的byte数组
-	//proof, err := c.getProof(*chResp)
-	//if err != nil {
-	//	return ret, err
-	//}
-	proof := []byte("success")
-
-	ret.Result, err = c.generateCallback(ibtp, result, proof)
-	fmt.Println("return value")
-	if err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-
-
-}
-
-// GetOutMessage 负责在跨链合约中查询历史跨链请求。查询键值中to指定目的链，idx指定序号，查询结果为以Plugin负责的区块链作为来源链的跨链请求。
-func (c *Client) GetOutMessage(to string, idx uint64) (*pb.IBTP, error) {
-	// 这里由于我们使用的本身就是一个set/get合约，所以可以直接获取meta信息
-	// 本区块链暂时不可能发出交易
-	// =====分析内容如下，首先是to-idx拼接之后读取到的内容====
-	// v, err := stub.GetState(key)
-	// =====而该内容则是按如下的方式存储的====
-	//ccArgs = append(ccArgs, []byte(callFunc.Func))
-	//ccArgs = append(ccArgs, callFunc.Args...)
-	//response := stub.InvokeChaincode(splitedCID[1], ccArgs, splitedCID[0])
-	//if response.Status != shim.OK {
-	//	return errorResponse(fmt.Sprintf("invoke chaincode '%s' function %s err: %s", splitedCID[1], callFunc.Func, response.Message))
-	//}
-	//
-	//inKey := broker.inMsgKey(sourceChainID, sequenceNum)
-	//value, err := json.Marshal(response)
-	//if err != nil {
-	//	return errorResponse(err.Error())
-	//}
-	//if err := stub.PutState(inKey, value);
-	// =====解析时则调用了如下的方法====
-	// c.unpackIBTP(&response, pb.IBTP_INTERCHAIN)
-	// =====unpack的主要逻辑如下：
-	//ret := &Event{}
-	//if err := json.Unmarshal(response.Payload, ret); err != nil {
-	//	return nil, err
-	//}
-	//proof, err := c.getProof(*response)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//ret.Proof = proof
-	//return ret.Convert2IBTP(c.pierId, ibtpType), nil
-
-	// =====综上，这里返回的实质是那次请求最后转化出的IBTP报文，所以这里我们最终还是存储IBTP报文
-	return nil, nil
-}
-
-// GetInMessage 负责在跨链合约中查询历史跨链请求。查询键值中from指定来源链，idx指定序号，查询结果为以Plugin负责的区块链作为目的链的跨链请求。
-func (c *Client) GetInMessage(from string, index uint64) ([][]byte, error) {
-	// 拿出从本链发出的请求，然后转换为IBTP格式进行返回，这里的话直接把请求转为IBTP，或者直接存IBTP？
-	// 最后决定直接存储用逗号隔开的参数字符串
-	key := fmt.Sprintf("%s-%s", from, index)
-	results := []string{"true"}
-	results = append(results, strings.Split(c.inMsgMap[key], ",")...)
-	//return toChaincodeArgs(results...), nil
-	return toChaincodeArgs(results...), nil
-}
-
-// GetInMeta 是获取跨链请求相关的Meta信息的接口。以Plugin负责的区块链为目的链的一系列跨链请求的序号信息。如果Plugin负责A链，则可能有多条链和A进行跨链，如B->A:3; C->A:5。返回的map中，key值为来源链ID，value对应该来源链已发送的最新的跨链请求的序号，如{B:3, C:5}。
-func (c *Client) GetInMeta() (map[string]uint64, error) {
-	// 直接返回对应的meta
-	//return c.unpackMap(response)
-	c.readMapFromFile("/home/hzh/bitxhub/sawtooth.txt")
-	textBytes,_ := json.Marshal(c.inMeta)
-	fmt.Println("获取到inMeta为 " + string(textBytes))
-	return c.inMeta, nil
-}
-
-// GetOutMeta 是获取跨链请求相关的Meta信息的接口。以Plugin负责的区块链为来源链的一系列跨链请求的序号信息。如果Plugin负责A链，则A可能和多条链进行跨链，如A->B:3; A->C:5。返回的map中，key值为目的链ID，value对应已发送到该目的链的最新跨链请求的序号，如{B:3, C:5}。
-func (c *Client) GetOutMeta() (map[string]uint64, error) {
-	// 直接返回对应的meta
-	//return c.unpackMap(response)
-	return c.outMeta, nil
-}
-
-
-// GetCallbackMeta 是获取跨链请求相关的Meta信息的接口。以Plugin负责的区块链为来源链的一系列跨链请求的序号信息。如果Plugin负责A链，则A可能和多条链进行跨链，如A->B:3; A->C:5；同时由于跨链请求中支持回调操作，即A->B->A为一次完整的跨链操作，我们需要记录回调请求的序号信息，如A->B->:2; A->C—>A:4。返回的map中，key值为目的链ID，value对应到该目的链最新的带回调跨链请求的序号，如{B:2, C:4}。（注意 CallbackMeta序号可能和outMeta是不一致的，这是由于由A发出的跨链请求部分是没有回调的）
-func (c Client) GetCallbackMeta() (map[string]uint64, error) {
-	// 直接返回对应的meta
-	//return c.unpackMap(response)
-	return c.callbackMeta, nil
-}
-
-// CommitCallback 执行完IBTP包之后进行一些回调操作
-func (c *Client) CommitCallback(ibtp *pb.IBTP) error {
-	// 似乎可以不用管，fabric插件中也没有实现
-	return nil
-}
-
-// Name 描述Plugin负责的区块链的自定义名称，一般和业务相关，如司法链等。
-func (c *Client) Name() string {
-	return "data_swapper_test"
-}
-
-// Type 描述Plugin负责的区块链类型，比如Fabric
-func (c *Client) Type() string {
-	return "sawtooth"
-}
-
-func (c *Client) InvokeInterchain(from string, index uint64, destAddr string, bizCallData []byte) (string, error) {
-	// 主要的调用方法
-	// 目前这里必然是一个请求的回复
-	//req := true
-	// 直接更新一下索引
-	//if req {
-		c.inMeta[from] = index + 1
-	//} else {
-		c.outMeta[from] = index + 1
-	//}
-	// destAddr应该需要处理一下，这里直接简单修改为"get"
-	destAddr = "get"
-	// from、index、destAddr等应该是用来进行索引等meta数据的记录的
-
-	// ===========以下是fabric插件中的关键代码，args为全部参数============
-	//args := util.ToChaincodeArgs(from, strconv.FormatUint(index, 10), destAddr, req)
-	//args = append(args, bizCallData)
-	// 链码调用中则是这样的：
-	//// 调用的链
-	//sourceChainID := args[0]
-	//sequenceNum := args[1]
-	//// 本链
-	//targetCID := args[2]
-	//isReq, err := strconv.ParseBool(args[3])
-	//if err != nil {
-	//	return errorResponse(fmt.Sprintf("cannot parse %s to bool", args[3]))
-	//}
-	//
-	//if err := broker.updateIndex(stub, sourceChainID, sequenceNum, isReq); err != nil {
-	//	return errorResponse(err.Error())
-	//}
-	//
-	//splitedCID := strings.Split(targetCID, delimiter)
-	//if len(splitedCID) != 2 {
-	//	return errorResponse(fmt.Sprintf("Target chaincode id %s is not valid", targetCID))
-	//}
-	//
-	//callFunc := &CallFunc{}
-	//if err := json.Unmarshal([]byte(args[4]), callFunc); err != nil {
-	//	return errorResponse(fmt.Sprintf("unmarshal call func failed for %s", args[4]))
-	//}
-	// ===============================================
-
-
-	// 进行实际的链码调用，bizCallData为请求参数，这里是从CallBackFunc序列化得来的，这里直接给他反序列化了
-	bizCallFun := &CallFunc{}
-	json.Unmarshal(bizCallData, bizCallFun)
-	key := string(bizCallFun.Args[0])
-	// 返回参数
-	//newArgs := make([][]byte, 0)
-	value, _ := c.dsClient.Get(key) //"sawtoothresult"
-	// 将三个meta和一个msgMap进行持久化存储到文件中
-	c.writeMapToFile("/home/hzh/bitxhub/sawtooth.txt")
-	return key + "," + value, nil
-	
-	//newArgs = append(newArgs, bizCallFun.Args[0])
-	//newArgs = append(newArgs, []byte(value))
-	//// 调用sawtooth客户端来得到调用结果，事实上目前只会调用get方法，所以只需要得到get的key参数即可，key参数为简单转换为字节数组数组的字符串数组，所以只需要定位key的索引然后字节数组转字符串即可
-	//response := &Response{
-	//	OK:   true,
-	//	//Data: newArgs,
-	//}
-	////if err := json.Unmarshal(res.Payload, response); err != nil {
-	////	return nil, err
-	////}
-	//
-	//return response, nil
-}
-
-func (c *Client) IncreaseInMeta(original *pb.IBTP) (*pb.IBTP, error) {
-	// 直接更新索引
-	c.InvokeIndexUpdate(original.From, original.Index)
-	proof := []byte("success")
-	ibtp, err := c.generateCallback(original, nil, proof)
-	if err != nil {
-		return nil, err
-	}
-	return ibtp, nil
-}
-
-// 该方法似乎只更新了索引，返回索引更新的结果
-func (c Client) InvokeIndexUpdate(from string, index uint64) ( *Response, error) {
-	//
-	//req := true
-	// 直接更新一下索引
-	//if req {
-	c.inMeta[from] = index + 1
-	//} else {
-	c.outMeta[from] = index + 1
-	// 将三个meta和一个msgMap进行持久化存储到文件中
-	c.writeMapToFile("/home/hzh/bitxhub/sawtooth.txt")
-	//}
-	//// 构造请求参数
-	//args := util.ToChaincodeArgs(from, strconv.FormatUint(index, 10), req)
-	//request := channel.Request{
-	//	ChaincodeID: c.meta.CCID,
-	//	Fcn:         InvokeIndexUpdateMethod,
-	//	Args:        args,
-	//}
-	//// 进行实际的请求
-	//res, err := c.consumer.ChannelClient.Execute(request)
-	//if err != nil {
-	//	return nil, nil, err
-	//}
-	//// 返回请求的结果
-	//response := &Response{}
-	//if err := json.Unmarshal(res.Payload, response); err != nil {
-	//	return nil, nil, err
-	//}
-
-	//return &res, response, nil
-	return nil, nil
-}
-
-type Response struct {
-	OK      bool   `json:"ok"`
-	Message string `json:"message"`
-	Data    []byte `json:"data"`
 }

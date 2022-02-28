@@ -30,7 +30,7 @@ type Event struct {
 
 func NewBroker() *Broker {
 	return &Broker{
-		//init: false,
+		init: false,
 	}
 }
 

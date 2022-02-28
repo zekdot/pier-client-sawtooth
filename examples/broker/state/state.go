@@ -56,7 +56,7 @@ func (broker *BrokerState) SetMetaData(key string, value string) error {
 }
 
 func (broker *BrokerState)GetData(key string) (string, error) {
-	address := makeAddress(key, "regular")
+	address := makeAddress(key, "")
 	// 首先查看缓存
 	//data, ok := broker.addressCache[address]
 	//if ok {
@@ -74,7 +74,7 @@ func (broker *BrokerState)GetData(key string) (string, error) {
 }
 
 func (broker *BrokerState) SetData(key string, value string) error {
-	address := makeAddress(key, "regular")
+	address := makeAddress(key, "")
 	data := []byte(value)
 	// 进行缓存
 	//broker.addressCache[address] = data

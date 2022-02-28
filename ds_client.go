@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang/protobuf/proto"
-	"github.com/hyperledger/sawtooth-sdk-go/logging"
 	"github.com/hyperledger/sawtooth-sdk-go/protobuf/batch_pb2"
 	"github.com/hyperledger/sawtooth-sdk-go/protobuf/transaction_pb2"
 	"github.com/hyperledger/sawtooth-sdk-go/signing"
@@ -21,7 +20,7 @@ import (
 	"time"
 )
 
-var logger *logging.Logger = logging.Get()
+//var logger *logging.Logger = logging.Get()
 
 type DataSwapperClient struct {
 	url string
