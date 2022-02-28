@@ -1,6 +1,7 @@
 package main
 
 const (
+	RPC_URL = "127.0.0.1:1212"
 	FAMILY_NAME string = "data_swapper"
 	FAMILY_VERSION string = "1.0"
 	DISTRIBUTION_NAME string = "sawtooth-data_swapper"
