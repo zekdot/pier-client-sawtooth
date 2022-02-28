@@ -93,7 +93,7 @@ func (c *Client) polling() {
 	for {
 		select {
 		case <-c.ticker.C:
-			evs, err := c.client.polling(c.outMeta)
+			evs, err := c.client.Polling(c.outMeta)
 			if err != nil {
 				return
 			}
@@ -145,9 +145,9 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 	//args := make([]string, len(content.Args) + 3)
 	//
 	//args = append(args, ibtp.From, strconv.FormatUint(ibtp.Index, 10), content.DstContractId)
-	//
+	// these three parameters are sure
 	args := []string {ibtp.From, strconv.FormatUint(ibtp.Index, 10), content.DstContractId}
-	//args := util.ToChaincodeArgs(ibtp.From, strconv.FormatUint(ibtp.Index, 10), content.DstContractId)
+	// others are not sure
 	for i := 0; i < len(content.Args); i ++ {
 		args = append(args, string(content.Args[i]))
 	}
@@ -172,20 +172,14 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 	var proof []byte
 	var err error
 	if err := retry.Retry(func(attempt uint) error {
-		var reply string
-		reqArgs := ReqArgs{
-			content.Func,
-			args,
+		if content.Func == "interchainGet" {
+			c.client.InterchainGet(args)
+		} else if content.Func == "interchainSet" {
+			c.client.InterchainSet(args)
 		}
-		err = c.client.Call("Service.SubmitTransaction", reqArgs, &reply)
-		res = reply
 		//res, err = c.contract.SubmitTransaction(funcName, args...)
 		//res, err = c.consumer.ChannelClient.Execute(request)
 		if err != nil {
-			//if strings.Contains(err.Error(), "Chaincode status Code: (500)") {
-			//	res.ChaincodeStatus = shim.ERROR
-			//	return nil
-			//}
 			return fmt.Errorf("execute request: %w", err)
 		}
 

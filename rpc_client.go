@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+const (
+	delimiter = "&"
+)
 type RpcClient struct {
 	client *rpc.Client
 }
@@ -27,7 +30,140 @@ func NewRpcClient(address string) (*RpcClient, error) {
 	}, nil
 }
 
-func (rpcClient *RpcClient) polling(m map[string]uint64) ([]*Event, error) {
+func (rpcClient *RpcClient) InterchainSet(args[] string) error {
+	if len(args) < 5 {
+		return fmt.Errorf("incorrect number of arguments, expecting 5")
+	}
+	sourceChainID := args[0]
+	sequenceNum := args[1]
+	targetCID := args[2]
+	key := args[3]
+	data := args[4]
+
+	if err := rpcClient.checkIndex(sourceChainID, sequenceNum, "callback-meta"); err != nil {
+		return err
+	}
+
+	idx, err := strconv.ParseUint(sequenceNum, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	if err := rpcClient.markCallbackCounter(sourceChainID, idx); err != nil {
+		return err
+	}
+
+	splitedCID := strings.Split(targetCID, delimiter)
+	if len(splitedCID) != 2 {
+		return fmt.Errorf("Target chaincode id %s is not valid", targetCID)
+	}
+
+	var reply string
+	reqArgs := ReqArgs{
+		"set",
+		[]string{key, data},
+	}
+	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (rpcClient *RpcClient) InterchainGet(args[] string) (string, error) {
+
+	if len(args) < 4 {
+		return "", fmt.Errorf("incorrect number of arguments, expecting 4")
+	}
+	sourceChainID := args[0]
+	sequenceNum := args[1]
+	targetCID := args[2]
+	key := args[3]
+
+	if err := rpcClient.checkIndex(sourceChainID, sequenceNum, "inner-meta"); err != nil {
+		return "", err
+	}
+
+	if err := rpcClient.markInCounter(sourceChainID); err != nil {
+		return "", err
+	}
+
+	splitedCID := strings.Split(targetCID, delimiter)
+	if len(splitedCID) != 2 {
+		return "", fmt.Errorf("Target chaincode id %s is not valid", targetCID)
+	}
+
+	// args[0]: key
+	value, err := rpcClient.GetData(key)
+	if err != nil {
+		return "", err
+	}
+
+	inKey := inMsgKey(sourceChainID, sequenceNum)
+	if err := rpcClient.SetData(inKey, value); err != nil {
+		return "", err
+	}
+
+	return value, nil
+}
+
+func (rpcClient *RpcClient) markInCounter(from string) error {
+	inMeta, err := rpcClient.GetInnerMeta()
+	if err != nil {
+		return err
+	}
+
+	inMeta[from]++
+	metaStr, err := json.Marshal(inMeta)
+	if err != nil {
+		return err
+	}
+	var reply string
+	reqArgs := ReqArgs{
+		"set",
+		[]string{"inner-meta", string(metaStr)},
+	}
+	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
+	return err
+}
+
+func (rpcClient *RpcClient) markCallbackCounter(from string, index uint64) error {
+	meta, err := rpcClient.GetCallbackMeta()
+	if err != nil {
+		return err
+	}
+
+	meta[from] = index
+	metaStr, err := json.Marshal(meta)
+	if err != nil {
+		return err
+	}
+	var reply string
+	reqArgs := ReqArgs{
+		"set",
+		[]string{"callback-meta", string(metaStr)},
+	}
+	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
+	return err
+}
+
+func (rpcClient *RpcClient) checkIndex(addr string, index string, metaName string) error {
+	idx, err := strconv.ParseUint(index, 10, 64)
+	if err != nil {
+		return err
+	}
+	meta, err := rpcClient.getMeta(metaName)  //broker.getMap(state, metaName)
+	if err != nil {
+		return err
+	}
+	if idx != meta[addr] + 1 {
+		return fmt.Errorf("incorrect index, expect %d", meta[addr]+1)
+	}
+	return nil
+}
+
+func (rpcClient *RpcClient) Polling(m map[string]uint64) ([]*Event, error) {
 	outMeta, err := rpcClient.GetOuterMeta()
 	if err != nil {
 		return nil, err
@@ -172,64 +308,6 @@ func (rpcClient *RpcClient) SetData(key string, value string) error {
 		[]string{key, value},
 	}
 	err := rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (rpcClient *RpcClient) InterchainGet(toId string, contractId string, key string) error {
-	cid := "mychannel&data_swapper"
-	//destChainId := toId
-	var reply string
-	reqArgs := ReqArgs{
-		"get",
-		[]string{"outter-meta"},
-	}
-	err := rpcClient.client.Call("Service.GetValue", reqArgs, &reply)
-	if err != nil {
-		return err
-	}
-	outMeta := make(map[string]uint64)
-	err = json.Unmarshal([]byte(reply), &outMeta)
-	if err != nil {
-		return err
-	}
-	if _, ok := outMeta[toId]; !ok {
-		outMeta[toId] = 0
-	}
-	tx := &Event{
-		Index:         outMeta[toId] + 1,
-		DstChainID:    toId,
-		SrcContractID: cid,
-		DstContractID: contractId,
-		Func:          "interchainGet",
-		Args:          key,
-		Callback:      "interchainSet",
-	}
-	outMeta[toId] ++
-	outMetaBytes, err := json.Marshal(outMeta)
-	if err != nil {
-		return err
-	}
-	reqArgs = ReqArgs{
-		"set",
-		[]string{"outter-meta", string(outMetaBytes)},
-	}
-	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
-	if err != nil {
-		return err
-	}
-	txValue, err := json.Marshal(tx)
-	if err != nil {
-		return err
-	}
-	outKey := outMsgKey(tx.DstChainID, strconv.FormatUint(tx.Index, 10))
-	reqArgs = ReqArgs{
-		"set",
-		[]string{outKey, string(txValue)},
-	}
-	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply);
 	if err != nil {
 		return err
 	}
