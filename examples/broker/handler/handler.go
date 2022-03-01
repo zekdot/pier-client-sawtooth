@@ -53,18 +53,18 @@ func (handler *BrokerHandler) Apply(request *processor_pb2.TpProcessRequest, con
 	//case "init":
 		//return nil
 		//return broker.Init(brokerState)
-	case "InterchainDataSwapInvoke":
-		return broker.InterchainDataSwapInvoke(brokerState, args[0], args[1], args[2])
-	case "InterchainInvoke":
-		return broker.InterchainInvoke(brokerState, args)
-	case "interchainSet":
-		return broker.InterchainSet(brokerState, args)
+	//case "InterchainDataSwapInvoke":
+	//	return broker.InterchainDataSwapInvoke(brokerState, args[0], args[1], args[2])
+	//case "InterchainInvoke":
+	//	return broker.InterchainInvoke(brokerState, args)
+	//case "interchainSet":
+	//	return broker.InterchainSet(brokerState, args)
 	case "set":
 		//return nil
 		return broker.Set(brokerState, args)
-	case "get":
-		_, err := broker.Get(brokerState, args)
-		return err
+	//case "get":
+	//	_, err := broker.Get(brokerState, args)
+	//	return err
 	default:
 		return &processor.InvalidTransactionError{
 			Msg: fmt.Sprintf("Invalid Action : '%v'", payload.Function)}
