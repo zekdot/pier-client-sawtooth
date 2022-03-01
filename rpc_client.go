@@ -203,7 +203,7 @@ func (rpcClient *RpcClient) GetInMessage(sourceChainID string, sequenceNum uint6
 }
 
 func (rpcClient *RpcClient) GetOutMessage(sourceChainID string, sequenceNum uint64)(*Event, error) {
-	key := inMsgKey(sourceChainID, strconv.FormatUint(sequenceNum, 10))
+	key := outMsgKey(sourceChainID, strconv.FormatUint(sequenceNum, 10))
 	var reply string
 	reqArgs := ReqArgs{
 		"get",

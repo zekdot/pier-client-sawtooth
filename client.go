@@ -173,7 +173,7 @@ func (c *Client) SubmitIBTP(ibtp *pb.IBTP) (*model.PluginResponse, error) {
 	var err error
 	if err := retry.Retry(func(attempt uint) error {
 		if content.Func == "interchainGet" {
-			c.client.InterchainGet(args)
+			res, _ = c.client.InterchainGet(args)
 		} else if content.Func == "interchainSet" {
 			c.client.InterchainSet(args)
 		}
