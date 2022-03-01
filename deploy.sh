@@ -1,1 +1,1 @@
-rsync -av ../pier-client-sawtooth hzh@hzh:/home/hzh/bitxhub
+rsync -av ../pier-client-sawtooth hzh@hzh:/home/hzh/bitxhub --exclude-from=exclude.list
