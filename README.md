@@ -169,5 +169,97 @@ As I said. You can join any appchain to your network because in current architec
 
 ### Implement RPC server
 
-You can use any language you prefer. Only need to make sure it support RPC. Here we take Go language client of fabric2 and Python language client of sawtooth as example to show it's effect.
+You can use any language you prefer. Only need to make sure it support RPC. Here we take Go language client of sawtooth as an example to show it's effect. I don't test other language for now. I will try more latter.
+
+  ```go
+package main
+
+import "fmt"
+type Service struct {
+	broker *BrokerClient
+}
+
+type ReqArgs struct {
+	FuncName string
+	Args []string
+}
+
+func NewService(broker *BrokerClient) *Service {
+	return &Service{
+		broker: broker,
+	}
+}
+
+// send transaction and don't need result
+func (s *Service) SetValue(req *ReqArgs, reply *string) error{
+
+	broker := s.broker
+	args := req.Args
+	fmt.Printf("set %s to %s\n", args[0], args[1])
+	err := broker.setValue(args[0], args[1])
+	return err
+}
+
+// query transaction and need result
+func (s *Service) GetValue(req *ReqArgs, reply *string) error{
+	broker := s.broker
+	args := req.Args
+	fmt.Printf("get value of %s\n", args[0])
+	res, err := broker.getValue(args[0])
+	*reply = string(res)
+	return err
+}
+  ```
+
+When you implement your own RPC server. Data structure and method should be correspondence with RPC client. 
+
+First is data structure part.
+
+```go
+type ReqArgs struct {
+	FuncName string
+	Args []string
+}
+```
+
+The data pass from client is consist of function name of type string and parameter of string array. For now FuncName is useless. Because we only provide get and set operation. Design of FuncName is for future expand. Args will only contains one or two parameters now. In set condition, Args will be {key, value}. In get condition, Args will be {key}.
+
+Then is operation part. 
+
+```go
+// send transaction and don't need result
+func (s *Service) SetValue(req *ReqArgs, reply *string) error{
+
+    // args[0]: key, args[1]: value
+	args := req.Args
+	// save key to value, implelented by yourself
+    
+	return err
+}
+
+// query transaction and need result
+func (s *Service) GetValue(req *ReqArgs, reply *string) error{
+    // args[0]: key
+	args := req.Args
+    // get value of key, implemented by yourself, then set value to *reply
+	*reply = string(res)
+    
+	return err
+}
+```
+
+RPC Client will call these method in following way:
+
+```go
+var reply string
+reqArgs := ReqArgs{
+	"get",
+	[]string{"outter-meta"},
+}
+err := rpcClient.client.Call("Service.GetValue", reqArgs, &reply)
+if err != nil {
+	return err
+}
+// use apply for other purpose
+```
 
