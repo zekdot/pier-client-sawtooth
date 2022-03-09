@@ -4,8 +4,9 @@ const (
 	FAMILY_NAME string = "broker"
 	FAMILY_VERSION string = "1.0"
 	DISTRIBUTION_NAME string = "sawtooth-broker"
-	DEFAULT_URL string = "http://127.0.0.1:8008"
-
+	KEY_PATH string = "/home/hzh/.sawtooth/keys/hzh.priv"
+	SAWTOOTH_URL string = "http://127.0.0.1:8008"
+	RPC_SERVER_URL string = "localhost:50051"
 	BATCH_SUBMIT_API string = "batches"
 	BATCH_STATUS_API string = "batch_statuses"
 	STATE_API string = "state"

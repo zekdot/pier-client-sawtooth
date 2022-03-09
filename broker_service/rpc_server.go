@@ -1,39 +1,45 @@
 package main
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"log"
+	pb "nju.edu.cn/zekdot/broker_service/envelope"
+)
 
-type Service struct {
+type Server struct {
 	broker *BrokerClient
+	pb.UnimplementedPostServiceServer
 }
 
-
-type ReqArgs struct {
-	FuncName string
-	Args []string
-}
-
-func NewService(broker *BrokerClient) *Service {
-	return &Service{
-		broker: broker,
+func NewServer(client *BrokerClient) *Server {
+	return &Server {
+		broker: client,
 	}
 }
 
-// send transaction and don't need result
-func (s *Service) SetValue(req *ReqArgs, reply *string) error{
-
+func (s *Server) SendEnvelope(ctx context.Context, request *pb.EnvelopeRequest) (*pb.EnvelopeResponse, error) {
 	broker := s.broker
-	args := req.Args
-	fmt.Printf("set %s to %s\n", args[0], args[1])
-	err := broker.setValue(args[0], args[1])
-	return err
-}
-
-// query transaction and need result
-func (s *Service) GetValue(req *ReqArgs, reply *string) error{
-	broker := s.broker
-	args := req.Args
-	fmt.Printf("get value of %s\n", args[0])
-	res, err := broker.getValue(args[0])
-	*reply = string(res)
-	return err
+	args := request.Params
+	switch request.Func {
+	case "setValue":
+		log.Printf("set %s to %s\n", args[0], args[1])
+		err := broker.setValue(args[0], args[1])
+		if err != nil {
+			//return &pb.EnvelopeResponse{Code: "400", Result: err.Error()}, nil
+			return nil, err
+		}
+		return &pb.EnvelopeResponse{Code: "200", Result: "success"}, nil
+	case "getValue":
+		log.Printf("get value of %s\n", args[0])
+		res, err := broker.getValue(args[0])
+		if err != nil {
+			//return &pb.EnvelopeResponse{Code: "400", Result: err.Error()}, nil
+			return nil, err
+		}
+		return &pb.EnvelopeResponse{Code: "200", Result: string(res)}, nil
+	default:
+		return nil, fmt.Errorf("No such method")
+	}
+	return nil, nil
 }

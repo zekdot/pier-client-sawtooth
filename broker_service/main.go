@@ -1,47 +1,23 @@
 package main
 
 import (
+	"google.golang.org/grpc"
 	"log"
 	"net"
-	"net/http"
-	"net/rpc"
+	pb "nju.edu.cn/zekdot/broker_service/envelope"
 )
 
 func main() {
-	brokerClient, _ := NewBrokerClient("http://127.0.0.1:8008", "/home/hzh/.sawtooth/keys/hzh.priv")
-	service := NewService(brokerClient)
-	log.Printf("start listen")
-	rpc.Register(service)
-	rpc.HandleHTTP()
-	l, e := net.Listen("tcp", ":1212")
-	if e != nil {
-		log.Fatal("listen error: ", e)
+	lis, err := net.Listen("tcp", RPC_SERVER_URL)
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
 	}
-	http.Serve(l, nil)
-
-
-	//err := brokerClient.setValue("k2", "v1")
-	//if err != nil {
-	//	fmt.Errorf(err.Error())
-	//}
-	//res, err := brokerClient.getValue("k2")
-	//if err != nil {
-	//	fmt.Errorf(err.Error())
-	//}
-	//fmt.Println(string(res))
-	//value, err := brokerClient.Get("k1")
-	//if err != nil {
-	//	fmt.Println(err.Error())
-	//}
-	//fmt.Println(value)
-	//outMetaStr, err := brokerClient.getMeta("getOuterMeta")
-	//if err != nil {
-	//	fmt.Println(err.Error())
-	//}
-	//fmt.Println(outMetaStr)
-	//eventStr, err := brokerClient.pollingEvent("{}")
-	//if err != nil {
-	//	fmt.Println(err.Error())
-	//}
-	//fmt.Println(eventStr)
+	brokerClient, _ := NewBrokerClient(SAWTOOTH_URL, KEY_PATH)
+	server := NewServer(brokerClient)
+	serviceRegister := grpc.NewServer()
+	pb.RegisterPostServiceServer(serviceRegister, server)
+	log.Printf("server listening at %v", lis.Addr())
+	if err := serviceRegister.Serve(lis); err != nil {
+		log.Fatal("failed to serve: %v", err)
+	}
 }

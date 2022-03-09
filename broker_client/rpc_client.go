@@ -1,83 +1,63 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"net/rpc"
+	"google.golang.org/grpc"
 	"strconv"
+	pb "nju.edu.cn/zekdot/cli/envelope"
+	"time"
 )
 
 type RpcClient struct {
-	client *rpc.Client
-}
-
-type ReqArgs struct {
-	FuncName string
-	Args []string
+	client *pb.PostServiceClient
+	ctx context.Context
 }
 
 func NewRpcClient(address string) (*RpcClient, error) {
-	rpcClient, err := rpc.DialHTTP("tcp", address)
+	conn, err := grpc.Dial(address, grpc.WithInsecure())
 	if err != nil {
 		return nil, err
 	}
+	defer conn.Close()
+	client := pb.NewPostServiceClient(conn)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
 	return &RpcClient{
-		client: rpcClient,
+		client: &client,
+		ctx: ctx,
 	}, nil
 }
 
-func (rpcClient *RpcClient) Init() error {
-	var reply string
-	reqArgs := ReqArgs{
-		"init",
-		[]string{"inner-meta", "{}"},
-	}
-	err := rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
+func (rpcClient *RpcClient) GetData(key string) (string, error) {
+	r, err := rpcClient.client.SendEnvelope(rpcClient.ctx, &pb.EnvelopeRequest{Func: "getValue", Params: []string{key}})
 	if err != nil {
-		return err
+		return "", err
 	}
-	reqArgs = ReqArgs{
-		"init",
-		[]string{"outter-meta", "{}"},
-	}
-	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
-	if err != nil {
-		return err
-	}
-	reqArgs = ReqArgs{
-		"init",
-		[]string{"callback-meta", "{}"},
-	}
-	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
+	return r, nil
+}
+
+func (rpcClient *RpcClient) SetData(key string, value string) error {
+	_, err := rpcClient.client.SendEnvelope(rpcClient.ctx, &pb.EnvelopeRequest{Func: "setValue", Params: []string{key, value}})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (rpcClient *RpcClient) GetData(key string) (string, error) {
-	var reply string
-	reqArgs := ReqArgs{
-		"get",
-		[]string{key},
-	}
-	err := rpcClient.client.Call("Service.GetValue", reqArgs, &reply)
-	if err != nil {
-		return "", err
-	}
-	return reply, nil
-}
-
-func (rpcClient *RpcClient) SetData(key string, value string) error {
-	var reply string
-	reqArgs := ReqArgs{
-		"set",
-		[]string{key, value},
-	}
-	err := rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
+func (rpcClient *RpcClient) Init() error {
+	err := rpcClient.SetData("inner-meta", "{}")
 	if err != nil {
 		return err
 	}
+	err = rpcClient.SetData("outter-meta", "{}")
+	if err != nil {
+		return err
+	}
+	err = rpcClient.SetData("callback-meta", "{}")
 	return nil
 }
 
@@ -94,17 +74,12 @@ type Event struct {
 func (rpcClient *RpcClient) InterchainGet(toId string, contractId string, key string) error {
 	cid := "mychannel&data_swapper"
 	//destChainId := toId
-	var reply string
-	reqArgs := ReqArgs{
-		"get",
-		[]string{"outter-meta"},
-	}
-	err := rpcClient.client.Call("Service.GetValue", reqArgs, &reply)
+	outMetaStr, err := rpcClient.GetData("outter-meta")
 	if err != nil {
 		return err
 	}
 	outMeta := make(map[string]uint64)
-	err = json.Unmarshal([]byte(reply), &outMeta)
+	err = json.Unmarshal([]byte(outMetaStr), &outMeta)
 	if err != nil {
 		return err
 	}
@@ -125,11 +100,7 @@ func (rpcClient *RpcClient) InterchainGet(toId string, contractId string, key st
 	if err != nil {
 		return err
 	}
-	reqArgs = ReqArgs{
-		"set",
-		[]string{"outter-meta", string(outMetaBytes)},
-	}
-	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply)
+	err = rpcClient.SetData("outter-meta", string(outMetaBytes))
 	if err != nil {
 		return err
 	}
@@ -138,11 +109,7 @@ func (rpcClient *RpcClient) InterchainGet(toId string, contractId string, key st
 		return err
 	}
 	outKey := outMsgKey(tx.DstChainID, strconv.FormatUint(tx.Index, 10))
-	reqArgs = ReqArgs{
-		"set",
-		[]string{outKey, string(txValue)},
-	}
-	err = rpcClient.client.Call("Service.SetValue", reqArgs, &reply);
+	err = rpcClient.SetData(outKey, string(txValue))
 	if err != nil {
 		return err
 	}

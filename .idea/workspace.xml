@@ -10,7 +10,19 @@
     <select />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="30164547-2db0-4d99-a8a4-2ef0521b526a" name="Default Changelist" comment="" />
+    <list default="true" id="30164547-2db0-4d99-a8a4-2ef0521b526a" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/broker_client/envelope/envelope.pb.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/broker_client/envelope/envelope_grpc.pb.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/broker_service/envelope/envelope.pb.go" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/broker_service/envelope/envelope_grpc.pb.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/constants.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/constants.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_client/rpc_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_client/rpc_client.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_service/constants.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_service/constants.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_service/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_service/main.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/broker_service/rpc_server.go" beforeDir="false" afterPath="$PROJECT_DIR$/broker_service/rpc_server.go" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -42,7 +54,7 @@
     <property name="go.import.settings.migrated" value="true" />
     <property name="go.sdk.automatically.set" value="true" />
     <property name="go.tried.to.enable.integration.vgo.integrator" value="true" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/broker_client" />
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.detected.package.tslint" value="true" />
     <property name="node.js.path.for.package.eslint" value="project" />
@@ -51,14 +63,17 @@
     <property name="node.js.selected.package.tslint" value="(autodetect)" />
   </component>
   <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/broker_client" />
+      <recent name="$PROJECT_DIR$/broker_service/envelope" />
+      <recent name="$PROJECT_DIR$/broker_service" />
+      <recent name="$PROJECT_DIR$" />
+    </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/broker_service/envelope" />
       <recent name="$PROJECT_DIR$" />
       <recent name="$PROJECT_DIR$/examples/data_swapper" />
       <recent name="$PROJECT_DIR$/examples/data_swapper/handler" />
-    </key>
-    <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$" />
-      <recent name="$PROJECT_DIR$/broker_client" />
     </key>
   </component>
   <component name="RunManager">

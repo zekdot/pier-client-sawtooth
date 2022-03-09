@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package envelope;
+option go_package = "github.com/meshplus/pier-client-sawtooth/envelope";
+service PostService {
+  rpc sendEnvelope(EnvelopeRequest) returns (EnvelopeResponse){}
+}
+
+message EnvelopeRequest {
+  string func = 1;
+  repeated string params = 2;
+}
+
+message EnvelopeResponse {
+  string code = 1;
+  string result = 2;
+}

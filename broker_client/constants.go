@@ -1,7 +1,7 @@
 package main
 
 const (
-	RPC_URL = "127.0.0.1:1212"
+	RPC_URL = "localhost:50051"
 	//FAMILY_NAME string = "broker"
 	//FAMILY_VERSION string = "1.0"
 	//DISTRIBUTION_NAME string = "sawtooth-broker"
