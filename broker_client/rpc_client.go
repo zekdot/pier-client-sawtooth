@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"google.golang.org/grpc"
-	"strconv"
 	pb "nju.edu.cn/zekdot/cli/envelope"
+	"strconv"
 	"time"
 )
 
 type RpcClient struct {
 	client *pb.PostServiceClient
-	ctx context.Context
+	ctx *context.Context
 }
 
 func NewRpcClient(address string) (*RpcClient, error) {
@@ -20,28 +20,32 @@ func NewRpcClient(address string) (*RpcClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	//defer conn.Close()
 	client := pb.NewPostServiceClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	//client.SendEnvelope()
+	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	//r, err := client.SendEnvelope(ctx, &pb.EnvelopeRequest{Func: "getValue", Params: []string{"outter-meta"}})
+	//log.Printf(r.Result)
+	//defer cancel()
 
 	return &RpcClient{
 		client: &client,
-		ctx: ctx,
+		ctx: &ctx,
 	}, nil
 }
 
 func (rpcClient *RpcClient) GetData(key string) (string, error) {
-	r, err := rpcClient.client.SendEnvelope(rpcClient.ctx, &pb.EnvelopeRequest{Func: "getValue", Params: []string{key}})
+	client := *rpcClient.client
+	r, err := client.SendEnvelope(*rpcClient.ctx, &pb.EnvelopeRequest{Func: "getValue", Params: []string{key}})
 	if err != nil {
 		return "", err
 	}
-	return r, nil
+	return r.Result, nil
 }
 
 func (rpcClient *RpcClient) SetData(key string, value string) error {
-	_, err := rpcClient.client.SendEnvelope(rpcClient.ctx, &pb.EnvelopeRequest{Func: "setValue", Params: []string{key, value}})
+	client := *rpcClient.client
+	_, err := client.SendEnvelope(*rpcClient.ctx, &pb.EnvelopeRequest{Func: "setValue", Params: []string{key, value}})
 	if err != nil {
 		return err
 	}
