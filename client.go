@@ -27,7 +27,8 @@ var _ client.Client = (*Client)(nil)
 const (
 
 	PollingEventMethod    = "pollingEvent"
-	FabricType            = "fabric2.0"
+	//FabricType            = "fabric2.0"
+	SawtoothType		= "sawtooth"
 )
 
 type Client struct {
@@ -124,7 +125,7 @@ func (c *Client) Name() string {
 }
 
 func (c *Client) Type() string {
-	return FabricType
+	return SawtoothType
 }
 
 func (c *Client) GetIBTP() chan *pb.IBTP {
