@@ -1,0 +1,17 @@
+syntax="proto3";
+
+package envelope;
+option go_package = "zekdot.com/go/demo";
+service PostService {
+  rpc SendEnvelope (EnvelopeRequest) returns (EnvelopeResponse) {}
+}
+
+message EnvelopeRequest {
+  string func = 1;
+  repeated string params = 2;
+}
+
+message EnvelopeResponse {
+  int32 code = 1;
+  string result = 2;
+}
