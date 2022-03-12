@@ -13,6 +13,7 @@ func main() {
 	client.set("key1", "value1")
 	value, err := client.get("key1")
 	fmt.Println(value)
+	client.close()
 	//client.InterchainGet("0x78546467877877", "data&swapper", "key2")
 	//value, err = client.get("key2")
 	//fmt.Println(value)

@@ -11,25 +11,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="30164547-2db0-4d99-a8a4-2ef0521b526a" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/proto/envelope.proto" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_client_go/envelope/envelope.pb.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_client_go/envelope/envelope.proto" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_client_go/envelope/envelope_grpc.pb.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_client_go/grpc_client.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_client_go/main.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_server/constants.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_server/envelope/envelope.pb.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_server/envelope/envelope_grpc.pb.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_server/main.go" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/sdk_server/rpc_client.go" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_client/constants.go" beforeDir="false" afterPath="$PROJECT_DIR$/cli_client/constants.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_client/get.go" beforeDir="false" afterPath="$PROJECT_DIR$/cli_client/get.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_client/init.go" beforeDir="false" afterPath="$PROJECT_DIR$/cli_client/init.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_client/interchainGet.go" beforeDir="false" afterPath="$PROJECT_DIR$/cli_client/interchainGet.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_client/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/cli_client/main.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_client/rpc_client.go" beforeDir="false" afterPath="$PROJECT_DIR$/cli_client/rpc_client.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/broker_client/set.go" beforeDir="false" afterPath="$PROJECT_DIR$/cli_client/set.go" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sdk_client_go/main.go" beforeDir="false" afterPath="$PROJECT_DIR$/sdk_client_go/main.go" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

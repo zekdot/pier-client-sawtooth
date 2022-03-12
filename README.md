@@ -134,7 +134,7 @@ INFO[06:30:10.835] Add pier                                      id=0x2cb98405fe
 
 Now whole network is ready.
 
-## How to use
+## How to use in command line
 
 ### Prepare data
 
@@ -145,6 +145,8 @@ We set value1 to key1 on sawtooth chain. And set value2 to key2 on fabric chain.
 ```
 
 Now assume we want to fetch key2's value on fabric chain and it's pier id is `0x54100029b40d9fd42eb64674867fec76af82824a`.
+
+### Send cross-chain request
 
 Use this command to call a cross-chain request:
 
@@ -160,6 +162,69 @@ key2 :  value2
 ```
 
 As show in output. We have get data from fabric chain.
+
+## How to use in SDK
+
+I am going to support more language rather than just Go. So I use gRPC to make backend part to communicate with rpc-server. Whole network and its protocol will be as following.
+
+![](./figure/figure2.png)
+
+### Start SDK_server
+
+First modify `sdk_server/constants.go` according your situation. 
+
+* RPC_URL: your RPC server IP and port
+* GRPC_URL: IP and port that SDK server will use to communicate with SDK client.
+
+Copy `sdk_server` to your workspace and run following command to start sdk server part.
+
+```sh
+cd sdk_server
+go run *.go
+```
+
+When see the following output, server is ready.
+
+```
+hzh@hzh:~/sawtooth/sdk_server$ go run *.go
+2022/03/12 12:49:09 server listening at 127.0.0.1:50051
+```
+
+### Use SDK_client
+
+Because SDK will support many language, so I will introduce them one by one.
+
+#### sdk_client_go
+
+Now I provide four method to call. Source code is in `sdk_client_go/grpc_client.go`
+
+* get(key string) (string, error)
+* set(key string, value string) error
+* InterchainGet(targetId string, ccId string, key string) error
+* Init() error
+
+When need to send cross-chain request, call interchainGet to fetch data from other appchain.
+
+Here is an example of using.
+
+```go
+package main
+import (
+	"fmt"
+	"log"
+)
+
+func main() {
+	client, err := NewGrpcClient("localhost:50051")
+	if err != nil {
+		log.Fatal(err)
+	}
+	client.set("key1", "value1")
+	value, err := client.get("key1")
+	fmt.Println(value)
+	client.close()
+}
+```
 
 ## How to join other appchain type
 
