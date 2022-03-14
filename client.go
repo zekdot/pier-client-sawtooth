@@ -27,7 +27,7 @@ var _ client.Client = (*Client)(nil)
 const (
 
 	PollingEventMethod    = "pollingEvent"
-	FabricType            = "fabric2.0"
+	FabricType            = "sawtooth"
 )
 
 type Client struct {
