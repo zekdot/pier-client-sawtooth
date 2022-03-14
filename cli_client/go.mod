@@ -1,3 +1,3 @@
-module nju.edu.cn/sdk-client
+module nju.edu.cn/cli
 
 go 1.15
