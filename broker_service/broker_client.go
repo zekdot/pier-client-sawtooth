@@ -47,15 +47,21 @@ func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 
 // only need to fetch value according to the key
 func (broker *BrokerClient)getValue(key string) ([]byte, error) {
-	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, broker.getAddress(key))
+	// if necessary, change this address to a constant
+	address := broker.getAddress(key)
+	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, address)
 	fmt.Printf("apiSuffix is %s\n", apiSuffix)
 	response, err := broker.sendRequest(apiSuffix, []byte{}, "", key)
+	fmt.Printf("Get raw data: %s", response)
 	if err != nil {
 		return nil, err
 	}
 	responseMap := make(map[interface{}]interface{})
 
-	err = yaml.Unmarshal([]byte(response), &responseMap)
+	//err = yaml.Unmarshal([]byte(response), &responseMap)
+	decoded, err := base64.StdEncoding.DecodeString(response)
+	fmt.Printf("After decode: %s", decoded)
+	err = json.Unmarshal(decoded, &responseMap)
 	if err != nil {
 		return nil, errors.New(fmt.Sprint("Error reading response: %v", err))
 	}
