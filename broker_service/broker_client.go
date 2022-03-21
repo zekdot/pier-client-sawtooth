@@ -52,28 +52,34 @@ func (broker *BrokerClient)getValue(key string) ([]byte, error) {
 	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, address)
 	fmt.Printf("apiSuffix is %s\n", apiSuffix)
 	response, err := broker.sendRequest(apiSuffix, []byte{}, "", key)
-	fmt.Printf("Get raw data: %s", response)
+	fmt.Printf("Get raw data: %s\n", response)
 	if err != nil {
 		return nil, err
 	}
-	responseMap := make(map[interface{}]interface{})
+	//responseMap := make(map[interface{}]interface{})
 
 	//err = yaml.Unmarshal([]byte(response), &responseMap)
 	decoded, err := base64.StdEncoding.DecodeString(response)
-	fmt.Printf("After decode: %s", decoded)
-	err = json.Unmarshal(decoded, &responseMap)
 	if err != nil {
-		return nil, errors.New(fmt.Sprint("Error reading response: %v", err))
+		fmt.Errorf("Can't be decoded\n")
+		return []byte(response), nil
 	}
-	data, ok := responseMap["data"].(string)
-	if !ok {
-		return nil, errors.New("Error reading as string")
-	}
-	responseData, err := base64.StdEncoding.DecodeString(data)
-	if err != nil {
-		return nil, errors.New(fmt.Sprint("Error decoding response: %v", err))
-	}
-	return responseData[:], nil
+	fmt.Printf("After decode: %s\n", decoded)
+
+	return decoded, err
+	//err = json.Unmarshal(decoded, &responseMap)
+	//if err != nil {
+	//	return nil, errors.New(fmt.Sprint("Error reading response: %v", err))
+	//}
+	//data, ok := responseMap["data"].(string)
+	//if !ok {
+	//	return nil, errors.New("Error reading as string")
+	//}
+	//responseData, err := base64.StdEncoding.DecodeString(data)
+	//if err != nil {
+	//	return nil, errors.New(fmt.Sprint("Error decoding response: %v", err))
+	//}
+	//return responseData[:], nil
 }
 
 // only need to set value according to the key and value
