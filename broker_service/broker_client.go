@@ -51,35 +51,23 @@ func (broker *BrokerClient)getValue(key string) ([]byte, error) {
 	address := broker.getAddress(key)
 	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, address)
 	fmt.Printf("apiSuffix is %s\n", apiSuffix)
-	response, err := broker.sendRequest(apiSuffix, []byte{}, "", key)
-	fmt.Printf("Get raw data: %s\n", response)
+	rawData, err := broker.sendRequest(apiSuffix, []byte{}, "", key)
+	fmt.Printf("Get raw data: %s\n", rawData)
 	if err != nil {
 		return nil, err
 	}
 	//responseMap := make(map[interface{}]interface{})
-
-	//err = yaml.Unmarshal([]byte(response), &responseMap)
-	decoded, err := base64.StdEncoding.DecodeString(response)
+	jsonArray := make([]map[string]string, 1)
+	err = json.Unmarshal([]byte(rawData), &jsonArray)
 	if err != nil {
-		fmt.Errorf("Can't be decoded\n")
-		return []byte(response), nil
+		return nil, err
 	}
-	fmt.Printf("After decode: %s\n", decoded)
-
-	return decoded, err
-	//err = json.Unmarshal(decoded, &responseMap)
-	//if err != nil {
-	//	return nil, errors.New(fmt.Sprint("Error reading response: %v", err))
-	//}
-	//data, ok := responseMap["data"].(string)
-	//if !ok {
-	//	return nil, errors.New("Error reading as string")
-	//}
-	//responseData, err := base64.StdEncoding.DecodeString(data)
-	//if err != nil {
-	//	return nil, errors.New(fmt.Sprint("Error decoding response: %v", err))
-	//}
-	//return responseData[:], nil
+	fishStr, err := base64.StdEncoding.DecodeString(jsonArray[0]["data"])
+	//err = yaml.Unmarshal([]byte(response), &responseMap)
+	if err != nil {
+		return nil, err
+	}
+	return fishStr, nil
 }
 
 // only need to set value according to the key and value
@@ -99,11 +87,12 @@ func (broker *BrokerClient) sendRequest(
 
 	// Construct URL
 	var url string
-	if strings.HasPrefix(broker.url, "http://") {
-		url = fmt.Sprintf("%s/%s", broker.url, apiSuffix)
-	} else {
-		url = fmt.Sprintf("http://%s/%s", broker.url, apiSuffix)
-	}
+	url = fmt.Sprintf("%s/%s", SAWTOOTH_URL, apiSuffix)
+	//if strings.HasPrefix(broker.url, "http://") {
+	//	url = fmt.Sprintf("%s/%s", broker.url, apiSuffix)
+	//} else {
+	//	url = fmt.Sprintf("http://%s/%s", broker.url, apiSuffix)
+	//}
 
 	// Send request to validator URL
 	var response *http.Response
@@ -285,11 +274,11 @@ func Sha512HashValue(value string) string {
 }
 
 func (broker *BrokerClient) getPrefix() string {
-	return Sha512HashValue(FAMILY_NAME)[:FAMILY_NAMESPACE_ADDRESS_LENGTH]
+	return PREFIX
 }
 
 func (broker *BrokerClient) getAddress(name string) string {
 	prefix := broker.getPrefix()
-	nameAddress := Sha512HashValue(name)[:FAMILY_VERB_ADDRESS_LENGTH]
+	nameAddress := "00" + Sha512HashValue(name)[:FAMILY_VERB_ADDRESS_LENGTH]
 	return prefix + nameAddress
 }

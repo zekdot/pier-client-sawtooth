@@ -27,12 +27,7 @@ var _ client.Client = (*Client)(nil)
 const (
 
 	PollingEventMethod    = "pollingEvent"
-<<<<<<< HEAD
-	FabricType            = "sawtooth"
-=======
-	//FabricType            = "fabric2.0"
 	SawtoothType		= "sawtooth"
->>>>>>> heavy-plugin
 )
 
 type Client struct {
