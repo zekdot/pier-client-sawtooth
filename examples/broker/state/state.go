@@ -8,42 +8,23 @@ import (
 	"strings"
 )
 
-var Namespace = hexdigest("broker")[:6]
-
+//var Namespace = hexdigest("broker")[:6]
+var DataNamespace = "19d832"
+var MetaNamespace = "19d732"
 
 // 直接存储key到另一个字符串的映射
 type BrokerState struct {
 	context *processor.Context
-	//addressCache map[string][]byte
 }
 
 func NewBrokerState(context *processor.Context) *BrokerState {
 	return &BrokerState{
 		context: context,
-		//addressCache: make(map[string][]byte),
 	}
-}
-
-func (broker *BrokerState)GetMetaData(key string) (string, error) {
-	address := makeAddress(key, "meta")
-	// 首先查看缓存
-	//data, ok := broker.addressCache[address]
-	//if ok {
-	//	if broker.addressCache[address] != nil {
-	//		fmt.Print("hit in cache")
-	//		return string(data), nil
-	//	}
-	//}
-	// 没有的话再从账本中去取
-	results, err := broker.context.GetState([]string{address})
-	if err != nil {
-		return "", err
-	}
-	return string(results[address][:]), nil
 }
 
 func (broker *BrokerState) SetMetaData(key string, value string) error {
-	address := makeAddress(key, "meta")
+	address := makeAddress(MetaNamespace, key)
 	data := []byte(value)
 	// 进行缓存
 	//broker.addressCache[address] = data
@@ -55,26 +36,8 @@ func (broker *BrokerState) SetMetaData(key string, value string) error {
 	return err
 }
 
-func (broker *BrokerState)GetData(key string) (string, error) {
-	address := makeAddress(key, "")
-	// 首先查看缓存
-	//data, ok := broker.addressCache[address]
-	//if ok {
-	//	if broker.addressCache[address] != nil {
-	//		fmt.Print("hit in cache")
-	//		return string(data), nil
-	//	}
-	//}
-	// 没有的话再从账本中去取
-	results, err := broker.context.GetState([]string{address})
-	if err != nil {
-		return "", err
-	}
-	return string(results[address][:]), nil
-}
-
 func (broker *BrokerState) SetData(key string, value string) error {
-	address := makeAddress(key, "")
+	address := makeAddress(DataNamespace, key)
 	data := []byte(value)
 	// 进行缓存
 	//broker.addressCache[address] = data
@@ -87,9 +50,9 @@ func (broker *BrokerState) SetData(key string, value string) error {
 }
 
 // split regular data and meta
-func makeAddress(name string, typeValue string) string {
-	fmt.Printf("get digest of %s\n", (typeValue + name))
-	return Namespace + hexdigest(typeValue + name)[:64]
+func makeAddress(prefix string, name string) string {
+	//fmt.Printf("get digest of %s\n", (typeValue + name))
+	return prefix + "00" + hexdigest(name)[:62]
 }
 
 func hexdigest(str string) string {

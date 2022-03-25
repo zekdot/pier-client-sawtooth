@@ -160,7 +160,7 @@ func (broker *BrokerClient) sendTransaction(
 	// construct the address
 	address := broker.getAddress(key)
 	//fmt.Printf("send %v\n", string(payload))
-	//fmt.Printf("get address hash %v\n", address)
+	fmt.Printf("save to address hash %v\n", address)
 	// Construct TransactionHeader
 	rawTransactionHeader := transaction_pb2.TransactionHeader{
 		SignerPublicKey:  broker.signer.GetPublicKey().AsHex(),

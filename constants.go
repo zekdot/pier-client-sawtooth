@@ -16,5 +16,5 @@ const (
 	CONTENT_TYPE_OCTET_STREAM string = "application/octet-stream"
 
 	FAMILY_NAMESPACE_ADDRESS_LENGTH uint = 6
-	FAMILY_VERB_ADDRESS_LENGTH uint = 64
+	FAMILY_VERB_ADDRESS_LENGTH uint = 62
 )

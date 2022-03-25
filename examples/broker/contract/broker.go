@@ -32,11 +32,22 @@ func NewBroker() *Broker {
 	}
 }
 
-func (broker *Broker) Set(state *state.BrokerState, args []string) error {
+func (broker *Broker) SetData(state *state.BrokerState, args []string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("incorrect number of arguments")
 	}
 	err := state.SetData(args[0], args[1])
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (broker *Broker) SetMeta(state *state.BrokerState, args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("incorrect number of arguments")
+	}
+	err := state.SetMetaData(args[0], args[1])
 	if err != nil {
 		return err
 	}
