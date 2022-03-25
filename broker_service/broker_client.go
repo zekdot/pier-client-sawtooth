@@ -14,6 +14,7 @@ import (
 	"github.com/hyperledger/sawtooth-sdk-go/signing"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -45,25 +46,48 @@ func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 	return &BrokerClient{url, signer}, nil
 }
 
+func (broker *BrokerClient) isMetaRequest(key string) bool {
+	var prefix = key[:4]
+	return prefix == "inne" || prefix == "outt" || prefix == "call" || prefix == "in-m" || prefix == "out-"
+}
+
 // only need to fetch value according to the key
 func (broker *BrokerClient)getValue(key string) ([]byte, error) {
-	// if necessary, change this address to a constant
-	address := broker.getAddress(key)
+	var address string
+	var isMeta = broker.isMetaRequest(key)
+	if isMeta {
+		address = broker.getAddress(META_NAMESPACE, key)
+	} else {
+		address = broker.getAddress(DATA_NAMESPACE, key)
+	}
 	apiSuffix := fmt.Sprintf("%s/%s", STATE_API, address)
-	fmt.Printf("apiSuffix is %s\n", apiSuffix)
+	log.Printf("apiSuffix is %s\n", apiSuffix)
+	//fmt.Printf()
+
 	rawData, err := broker.sendRequest(apiSuffix, []byte{}, "", key)
-	fmt.Printf("Get raw data: %s\n", rawData)
+	log.Printf("Get raw data: %s\n", rawData)
 	if err != nil {
 		return nil, err
 	}
-	//responseMap := make(map[interface{}]interface{})
-	jsonArray := make([]map[string]string, 1)
-	err = json.Unmarshal([]byte(rawData), &jsonArray)
+	responseMap := make(map[interface{}]interface{})
+	err = yaml.Unmarshal([]byte(rawData), &responseMap)
 	if err != nil {
-		return nil, err
+		return nil, errors.New(fmt.Sprint("Error reading response: %v", err))
 	}
-	fishStr, err := base64.StdEncoding.DecodeString(jsonArray[0]["data"])
-	//err = yaml.Unmarshal([]byte(response), &responseMap)
+	data, _ := responseMap["data"].(string)
+	log.Printf("After base64 decode: %s\n", data)
+
+	// FIXME only use in Norway side sawtooth
+	//if !isMeta {
+	//	jsonArray := make([]map[string]string, 1)
+	//	err = json.Unmarshal([]byte(data), &jsonArray)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	data = jsonArray[0]["data"]
+	//}
+
+	fishStr, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {
 		return nil, err
 	}
@@ -72,11 +96,17 @@ func (broker *BrokerClient)getValue(key string) ([]byte, error) {
 
 // only need to set value according to the key and value
 func (broker *BrokerClient)setValue(key string, value string) error {
-	 _,err := broker.sendTransaction("set", key, value, 0)
-	 if err != nil {
-	 	return err
-	 }
-	 return nil
+	var err error
+	if broker.isMetaRequest(key) {
+		_, err = broker.sendTransaction("setMeta", key, value, 0)
+	} else {
+		// in fact, in our situation, there won't be setData be called
+		_, err = broker.sendTransaction("setData", key, value, 0)
+	}
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (broker *BrokerClient) sendRequest(
@@ -88,11 +118,6 @@ func (broker *BrokerClient) sendRequest(
 	// Construct URL
 	var url string
 	url = fmt.Sprintf("%s/%s", SAWTOOTH_URL, apiSuffix)
-	//if strings.HasPrefix(broker.url, "http://") {
-	//	url = fmt.Sprintf("%s/%s", broker.url, apiSuffix)
-	//} else {
-	//	url = fmt.Sprintf("http://%s/%s", broker.url, apiSuffix)
-	//}
 
 	// Send request to validator URL
 	var response *http.Response
@@ -145,22 +170,24 @@ func (broker *BrokerClient) getStatus(
 func (broker *BrokerClient) sendTransaction(
 	function string, key string, value string, wait uint) (string, error) {
 	rand.Seed(time.Now().Unix())
-	// construct the payload information in CBOR format
+
 	payloadData := make(map[string]interface{})
 	payloadData["Function"] = function
 	args := make([]string, 0)
 	args = append(args, key, value, strconv.Itoa(rand.Int()))
-	//payloadData["Key"] = [key, value]
 	payloadData["Parameter"] = args
-	//payload := fmt.Sprintf("%s,%s,%s", payloadData["Action"], payloadData["Key"], payloadData["Value"])
 	payload, err := json.Marshal(payloadData)
 	if err != nil {
 		return "", err
 	}
 	// construct the address
-	address := broker.getAddress(key)
-	//fmt.Printf("send %v\n", string(payload))
-	fmt.Printf("save to address hash %v\n", address)
+	var address string
+	if function == "setMeta" {
+		address = broker.getAddress(META_NAMESPACE, key)
+	} else if function == "setData" {
+		address = broker.getAddress(DATA_NAMESPACE, key)
+	}
+	log.Printf("save to address hash %v\n", address)
 	// Construct TransactionHeader
 	rawTransactionHeader := transaction_pb2.TransactionHeader{
 		SignerPublicKey:  broker.signer.GetPublicKey().AsHex(),
@@ -273,12 +300,8 @@ func Sha512HashValue(value string) string {
 	return strings.ToLower(hex.EncodeToString(hashHandler.Sum(nil)))
 }
 
-func (broker *BrokerClient) getPrefix() string {
-	return PREFIX
-}
-
-func (broker *BrokerClient) getAddress(name string) string {
-	prefix := broker.getPrefix()
+func (broker *BrokerClient) getAddress(prefix, name string) string {
+	//prefix := broker.getPrefix()
 	nameAddress := "00" + Sha512HashValue(name)[:FAMILY_VERB_ADDRESS_LENGTH]
 	return prefix + nameAddress
 }
