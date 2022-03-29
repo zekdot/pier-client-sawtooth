@@ -28,10 +28,12 @@ type BrokerClient struct {
 }
 
 func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
+	fmt.Println(keyfile)
 	var privateKey signing.PrivateKey
 	if keyfile != "" {
 		// Read private key file
 		privateKeyStr, err := ioutil.ReadFile(keyfile)
+		fmt.Println(privateKeyStr)
 		if err != nil {
 			return &BrokerClient{},
 				errors.New(fmt.Sprintf("Failed to read private key: %v", err))
@@ -43,6 +45,7 @@ func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 	}
 	cryptoFactory := signing.NewCryptoFactory(signing.NewSecp256k1Context())
 	signer := cryptoFactory.NewSigner(privateKey)
+	fmt.Println(signer)
 	return &BrokerClient{url, signer}, nil
 }
 
@@ -78,19 +81,18 @@ func (broker *BrokerClient)getValue(key string) ([]byte, error) {
 		return nil, errors.New(fmt.Sprint("Error reading response: %v", err))
 	}
 	data, _ := responseMap["data"].(string)
-	log.Printf("After base64 decode: %s\n", data)
 
-	// FIXME only use in Norway side sawtooth
-	if !isMeta {
-		jsonArray := make([]map[string]string, 1)
-		err = json.Unmarshal([]byte(data), &jsonArray)
-		if err != nil {
-			return nil, err
-		}
-		data = jsonArray[0]["data"]
-	}
+	//if !isMeta {
+	//	jsonArray := make([]map[string]string, 1)
+	//	err = json.Unmarshal([]byte(data), &jsonArray)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+	//	data = jsonArray[0]["data"]
+	//}
 
 	fishStr, err := base64.StdEncoding.DecodeString(data)
+	log.Printf("After base64 decode: %s\n", data)
 	if err != nil {
 		return nil, err
 	}
@@ -175,22 +177,21 @@ func (broker *BrokerClient) sendTransaction(
 	rand.Seed(time.Now().Unix())
 
 	payloadData := make(map[string]interface{})
-	payloadData["Function"] = function
-	args := make([]string, 0)
-	args = append(args, key, value, strconv.Itoa(rand.Int()))
-	payloadData["Parameter"] = args
+	payloadData["key"] = key
+	payloadData["value"] = value
 	payload, err := json.Marshal(payloadData)
 	if err != nil {
 		return "", err
 	}
 	// construct the address
-	var address string
-	if function == "setMeta" {
-		address = broker.getAddress(META_NAMESPACE, key)
-	} else if function == "setData" {
-		address = broker.getAddress(DATA_NAMESPACE, key)
-	}
-	log.Printf("save to address hash %v\n", address)
+	//var address string
+	//if function == "setMeta" {
+	//	address = broker.getAddress(META_NAMESPACE, key)
+	//} else if function == "setData" {
+	//	address = broker.getAddress(DATA_NAMESPACE, key)
+	//}
+	//log.Printf("save to address hash %v\n", address)
+
 	// Construct TransactionHeader
 	rawTransactionHeader := transaction_pb2.TransactionHeader{
 		SignerPublicKey:  broker.signer.GetPublicKey().AsHex(),
@@ -199,8 +200,8 @@ func (broker *BrokerClient) sendTransaction(
 		Dependencies:     []string{}, // empty dependency list
 		Nonce:            strconv.Itoa(rand.Int()),
 		BatcherPublicKey: broker.signer.GetPublicKey().AsHex(),
-		Inputs:           []string{address},
-		Outputs:          []string{address},
+		Inputs:           []string{META_NAMESPACE},
+		Outputs:          []string{META_NAMESPACE},
 		PayloadSha512:    Sha512HashValue(string(payload)),
 	}
 	transactionHeader, err := proto.Marshal(&rawTransactionHeader)
