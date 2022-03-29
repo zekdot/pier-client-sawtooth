@@ -47,6 +47,9 @@ func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 }
 
 func (broker *BrokerClient) isMetaRequest(key string) bool {
+	if len(key) < 4 {
+		return false
+	}
 	var prefix = key[:4]
 	return prefix == "inne" || prefix == "outt" || prefix == "call" || prefix == "in-m" || prefix == "out-"
 }
@@ -78,14 +81,14 @@ func (broker *BrokerClient)getValue(key string) ([]byte, error) {
 	log.Printf("After base64 decode: %s\n", data)
 
 	// FIXME only use in Norway side sawtooth
-	//if !isMeta {
-	//	jsonArray := make([]map[string]string, 1)
-	//	err = json.Unmarshal([]byte(data), &jsonArray)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	data = jsonArray[0]["data"]
-	//}
+	if !isMeta {
+		jsonArray := make([]map[string]string, 1)
+		err = json.Unmarshal([]byte(data), &jsonArray)
+		if err != nil {
+			return nil, err
+		}
+		data = jsonArray[0]["data"]
+	}
 
 	fishStr, err := base64.StdEncoding.DecodeString(data)
 	if err != nil {

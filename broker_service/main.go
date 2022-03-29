@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	brokerClient, _ := NewBrokerClient("http://127.0.0.1:8008", "/home/hzh/.sawtooth/keys/hzh.priv")
+	brokerClient, _ := NewBrokerClient(SAWTOOTH_URL, "/home/hzh/.sawtooth/keys/hzh.priv")
 	service := NewService(brokerClient)
 	log.Printf("start listen")
 	rpc.Register(service)
