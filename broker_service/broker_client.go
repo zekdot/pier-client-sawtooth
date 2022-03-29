@@ -25,6 +25,7 @@ import (
 type BrokerClient struct {
 	url string
 	signer *signing.Signer
+	localFileHandle *LocalFileHandle
 }
 
 func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
@@ -45,8 +46,12 @@ func NewBrokerClient(url string, keyfile string) (*BrokerClient, error) {
 	}
 	cryptoFactory := signing.NewCryptoFactory(signing.NewSecp256k1Context())
 	signer := cryptoFactory.NewSigner(privateKey)
-	fmt.Println(signer)
-	return &BrokerClient{url, signer}, nil
+	//fmt.Println(signer)
+	localFileHandle, err := NewLocalFileHandle();
+	if err != nil {
+		return nil, err
+	}
+	return &BrokerClient{url, signer, localFileHandle}, nil
 }
 
 func (broker *BrokerClient) isMetaRequest(key string) bool {
@@ -62,7 +67,10 @@ func (broker *BrokerClient)getValue(key string) ([]byte, error) {
 	var address string
 	var isMeta = broker.isMetaRequest(key)
 	if isMeta {
-		address = broker.getAddress(META_NAMESPACE, key)
+		// address = broker.getAddress(META_NAMESPACE, key)
+		// directly read from local file
+		value := broker.localFileHandle.GetValue(key)
+		return []byte(value), nil
 	} else {
 		address = broker.getAddress(DATA_NAMESPACE, key)
 	}
@@ -103,7 +111,9 @@ func (broker *BrokerClient)getValue(key string) ([]byte, error) {
 func (broker *BrokerClient)setValue(key string, value string) error {
 	var err error
 	if broker.isMetaRequest(key) {
-		_, err = broker.sendTransaction("setMeta", key, value, 0)
+		//_, err = broker.sendTransaction("setMeta", key, value, 0)
+		// directly write to local file
+		broker.localFileHandle.SetValue(key, value)
 	} else {
 		// in fact, in our situation, there won't be setData be called
 		_, err = broker.sendTransaction("setData", key, value, 0)
@@ -176,19 +186,27 @@ func (broker *BrokerClient) sendTransaction(
 	function string, key string, value string, wait uint) (string, error) {
 	rand.Seed(time.Now().Unix())
 
+
 	payloadData := make(map[string]interface{})
-	payloadData["key"] = key
-	payloadData["value"] = value
+	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// If we save meta-data to local file, we won't use this method, so don't have to modify that
+	payloadData["Function"] = function
+	args := make([]string, 0)
+	args = append(args, key, value, strconv.Itoa(rand.Int()))
+	payloadData["Parameter"] = args
+	//payloadData["key"] = key
+	//payloadData["value"] = value
+	
 	payload, err := json.Marshal(payloadData)
 	if err != nil {
 		return "", err
 	}
 	// construct the address
-	//var address string
+	//address := META_NAMESPACE
 	//if function == "setMeta" {
 	//	address = broker.getAddress(META_NAMESPACE, key)
 	//} else if function == "setData" {
-	//	address = broker.getAddress(DATA_NAMESPACE, key)
+	address := broker.getAddress(DATA_NAMESPACE, key)
 	//}
 	//log.Printf("save to address hash %v\n", address)
 
@@ -200,8 +218,8 @@ func (broker *BrokerClient) sendTransaction(
 		Dependencies:     []string{}, // empty dependency list
 		Nonce:            strconv.Itoa(rand.Int()),
 		BatcherPublicKey: broker.signer.GetPublicKey().AsHex(),
-		Inputs:           []string{META_NAMESPACE},
-		Outputs:          []string{META_NAMESPACE},
+		Inputs:           []string{address},
+		Outputs:          []string{address},
 		PayloadSha512:    Sha512HashValue(string(payload)),
 	}
 	transactionHeader, err := proto.Marshal(&rawTransactionHeader)
